@@ -17,7 +17,7 @@ function SongPicker({ songs, onSongSelect }: Props) {
             <div className="song-picker-songs">
                 {songs.map((song) => (
                     <div key={song.id} className="song-picker-song" onClick={() => { onSongSelect(song) }}>
-                        <img src={`https://picsum.photos/2000/2000?random=${song.id}`} alt="Song cover" />
+                        <img src={song.cover} alt="Song cover" />
                         <div className="song-info">
                             <p>{song.title}</p>
                             <p>{song.artist}</p>
