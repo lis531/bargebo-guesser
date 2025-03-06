@@ -1,36 +1,34 @@
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+* {
+	font-family: 'DM Sans';
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
+.start-screen {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	height: 100vh;
+	color: white;
+	& > h1 {
+		font-family: 'DM Sans Bold';
+		font-size: 5em;
+	}
+	& > div {
+		height: 70%;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+		gap: 1em;
+		justify-self: center;
+	}
+	.start-screen-inputs {
+		display: flex;
+		flex-direction: column;
+		gap: 1em;
+	}
+	.start-screen-buttons {
+		display: flex;
+		color: black;
+		gap: 1em;
+	}
 }
