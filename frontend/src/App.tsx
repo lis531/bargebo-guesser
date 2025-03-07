@@ -52,87 +52,106 @@ function App() {
 			window.removeEventListener("keydown", handleKeyDown);
 		};
 	}, [lobbies]);
-    const onSongSelection = (song: { id: string; title: string; artist: string }) => {
-        setSelectedSong(song);
-        console.log("Selected song:", song);
-    };
-
-	const token = 'BQAO85Coe1l6mSGJf8v3-6plBfGmcTTcjkKXK3CpWAiE7SggSsk6ZSge0j_taSp2xv7EFz9OAH3KPpj-EytASvWsMamPazWjz3f-KbYb4_MACZAGelMk96G7SQl6zsd0LAFdMIcdN7SwDeJw_z4WXGsQ7t4qB5FOSAgHCf2pFehd4njv5zP9Q-E-azJT1Q-f0X4Dud92Z620f289f97y8N0STFHsKdO8s5Q7YgNPKS0pIZ_f44cqPhrsBaLzQd6p9z8zTOx3wduYPQT8UziPO6tdrOE9pK9AAbmC8Ul5N9nEghk8qAsCrMSKppQU';
 
 	interface Artist {
-	  name: string;
+		name: string;
 	}
-	
-	interface Track {
-	  album: any;
-	  name: string;
-	  artists: Artist[];
-	  popularity: number;
-	}
-	
-	async function fetchWebApi(endpoint: string, method: string, body?: any) {
-	  const res = await fetch(`https://api.spotify.com/${endpoint}`, {
-		headers: {
-		  Authorization: `Bearer ${token}`,
-		},
-		method,
-		body: body ? JSON.stringify(body) : undefined,
-	  });
-	  return await res.json();
-	}
-	
-	async function getPopularTracks(): Promise<Track[]> {
-	  const data = await fetchWebApi(
-		'v1/search?q=track&type=track&limit=50', 'GET', undefined
-	  );
-	  
-	  const popularTracks = data.tracks.items.filter((track: Track) => track.popularity > 50);
-	  
-	  return popularTracks;
-	}
-	
-	useEffect(() => {
-	  const fetchTracks = async () => {
-		const popularTracks = await getPopularTracks();
-		
-		if (popularTracks.length === 0) {
-		  console.log('No tracks found with popularity > 50.');
-		  return;
-		}
 
-		const selectedTracks = [];
-		for (let i = 0; i < 4; i++) {
-			const randomTrack = popularTracks[Math.floor(Math.random() * popularTracks.length)];
-			selectedTracks.push(randomTrack);
-		}
-	
-		setSongs(selectedTracks.map(track => ({
-			id: track.name,
-			title: track.name,
-			artist: track.artists.map(artist => artist.name).join(', '),
-			cover: track.album.images[0].url,
-		})));
-	  };
-	
-	  fetchTracks();
+	interface Track {
+		album: any;
+		name: string;
+		artists: Artist[];
+		popularity: number;
+	}
+
+	async function getAccessToken() {
+		const clientId = 'b8156c11c6ca4c32b541d3392225aed3';
+		const clientSecret = '24d6189fba74450fb8a7917fa150fcea';
+
+		const response = await fetch('https://accounts.spotify.com/api/token', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+				Authorization: `Basic ${btoa(clientId + ':' + clientSecret)}`,
+			},
+			body: 'grant_type=client_credentials',
+		});
+
+		const data = await response.json();
+		return data.access_token;
+	}
+
+	async function fetchWebApi(endpoint: string, method: string, body?: any) {
+		const token = await getAccessToken();
+		const res = await fetch(`https://api.spotify.com/${endpoint}`, {
+			headers: {
+				Authorization: `Bearer ${token}`,
+			},
+			method,
+			body: body ? JSON.stringify(body) : undefined,
+		});
+
+		return await res.json();
+	}
+
+
+	async function getPopularTracks(): Promise<Track[]> {
+		const data = await fetchWebApi(
+			'v1/search?q=track&type=track&limit=50', 'GET', undefined
+		);
+
+		const popularTracks = data.tracks.items.filter((track: Track) => track.popularity > 50);
+
+		return popularTracks;
+	}
+
+	useEffect(() => {
+		const fetchTracks = async () => {
+			const popularTracks = await getPopularTracks();
+
+			if (popularTracks.length === 0) {
+				console.log('No tracks found with popularity > 50.');
+				return;
+			}
+
+			const selectedTracks = [];
+			for (let i = 0; i < 4; i++) {
+				const randomTrack = popularTracks[Math.floor(Math.random() * popularTracks.length)];
+				selectedTracks.push(randomTrack);
+			}
+
+			setSongs(selectedTracks.map(track => ({
+				id: track.name,
+				title: track.name,
+				artist: track.artists.map(artist => artist.name).join(', '),
+				cover: track.album.images[0].url,
+			})));
+		};
+
+		fetchTracks();
 	}, []);
 
-    return (
-        <div className="start-screen">
-            <h1>BARGEBO GUESSER</h1>
-            <div>
-                <div className='start-screen-inputs'>
-                    <input placeholder="username" name="usernameInput" value={username} onChange={(e) => setUsername(e.target.value)} type="text" />
-                    <input placeholder="lobby name" name="lobbyInput" value={lobbyName} onChange={(e) => setLobbyName(e.target.value)} type="text" />
-                </div>
-                <div className='start-screen-buttons'>
-                    <button type="submit" onClick={() => joinLobby()}>Join Lobby</button>
-                    <button type="submit" onClick={() => createLobby()}>Create Lobby</button>
-                </div>
-            </div>
+	const onSongSelection = (song: { id: string; title: string; artist: string }) => {
+		setSelectedSong(song);
+		
+	};
+
+	return (
+		<div className="start-screen">
+			<h1>BARGEBO GUESSER</h1>
+			<div>
+				<div className='start-screen-inputs'>
+					<input placeholder="username" name="usernameInput" value={username} onChange={(e) => setUsername(e.target.value)} type="text" />
+					<input placeholder="lobby name" name="lobbyInput" value={lobbyName} onChange={(e) => setLobbyName(e.target.value)} type="text" />
+				</div>
+				<div className='start-screen-buttons'>
+					<button type="submit" onClick={() => joinLobby()}>Join Lobby</button>
+					<button type="submit" onClick={() => createLobby()}>Create Lobby</button>
+				</div>
+			</div>
 			<SongPicker songs={songs} onSongSelect={onSongSelection} />
 		</div>
-    );
+	);
 }
 
 export default App;

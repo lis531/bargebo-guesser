@@ -22,11 +22,25 @@
     background-color: #1a1a1a;
     overflow: hidden;
     cursor: pointer;
+
     & > img {
         width: 220px;
         height: 220px;
         border-radius: 10%;
         object-fit: cover;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    &.disabled:not(.selected) {
+        background-color: #000000;
+        color: red;
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    &.selected {
+        background-color: #ffffff;
     }
 }
 
@@ -45,6 +59,7 @@
     font-size: 1.1em;
     -webkit-user-select: none;
     user-select: none;
+
     & > p {
         margin: 0;
         padding: 0.5em;

@@ -8,10 +8,12 @@
 	align-items: center;
 	height: 100vh;
 	color: white;
+
 	& > h1 {
 		font-family: 'DM Sans Bold';
 		font-size: 5em;
 	}
+
 	& > div {
 		height: 70%;
 		display: flex;
@@ -21,11 +23,13 @@
 		gap: 1em;
 		justify-self: center;
 	}
+
 	.start-screen-inputs {
 		display: flex;
 		flex-direction: column;
 		gap: 1em;
 	}
+
 	.start-screen-buttons {
 		display: flex;
 		color: black;
