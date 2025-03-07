@@ -12,7 +12,7 @@ function App() {
 	const [lobbyNames, setLobbyNames] = useState([]);
 	const [currentLobby, setCurrentLobby] = useState("");
 	const [selectedSong, setSelectedSong] = useState<{ id: string; title: string; artist: string } | null>(null);
-	const [songs, setSongs] = useState<{ id: string; title: string; artist: string; cover: string; }[]>([]);
+	const [songs, setSongs] = useState<{ id: string; title: string; artist: string; cover: string; url: string; }[]>([]);	
 
 	useEffect(() => {
 		socket.on('onLobbyListChanged', (lobbyNames) => {
@@ -94,6 +94,7 @@ function App() {
 		name: string;
 		artists: Artist[];
 		popularity: number;
+		url: string;
 	}
 
 	async function getAccessToken() {
@@ -157,16 +158,33 @@ function App() {
 				title: track.name,
 				artist: track.artists.map(artist => artist.name).join(', '),
 				cover: track.album.images[0].url,
+				url: track.url,
 			})));
 		};
 
 		fetchTracks();
 	}, []);
 
-	const onSongSelection = (song: { id: string; title: string; artist: string }) => {
+	const onSongSelection = (song: { id: string; title: string; artist: string; url: string }) => {
 		setSelectedSong(song);
 		
 	};
+
+	const playSong = () => {
+		if (songs.length === 0) {
+			console.log("No songs available to play.");
+			return;
+		}
+	
+		const randomIndex = Math.floor(Math.random() * songs.length);
+		const randomSong = songs[randomIndex];
+	
+		const audio = new Audio(randomSong.url);
+		audio.play();
+	
+		console.log(`Playing: ${randomSong.title} by ${randomSong.artist}`);
+	};
+	
 
 	return (
 		<div className="start-screen">
@@ -182,6 +200,7 @@ function App() {
 					<button type="submit" onClick={() => startRound()}>Start Round</button>
 				</div>
 			</div>
+			<button onClick={() => playSong()}>Play Song</button>
 			<SongPicker songs={songs} onSongSelect={onSongSelection} />
 		</div>
 	);

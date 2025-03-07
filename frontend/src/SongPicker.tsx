@@ -6,17 +6,18 @@ interface Props {
         title: string;
         artist: string;
         cover: string;
+        url: string;
     }[];
-    onSongSelect: (song: { id: string; title: string; artist: string; cover: string; }) => void;
+    onSongSelect: (song: { id: string; title: string; artist: string; cover: string; url: string; }) => void;
 }
 
 function SongPicker({ songs, onSongSelect }: Props) {
-    const songSelected = (song: { id: string; title: string; artist: string; cover: string; }) => {
-        onSongSelect(song);
+    const songSelected = (song: { id: string; title: string; artist: string; cover: string; url: string }) => {
         let songsTiles = document.querySelectorAll(".song-picker-song") as NodeListOf<HTMLElement>;
         Array.from(songsTiles).map((tile) => {
             if (tile.id == song.id && !tile.classList.contains("disabled")) {
                 tile.classList.add("selected");
+                onSongSelect(song);
             }
             tile.classList.add("disabled");
             return tile;
