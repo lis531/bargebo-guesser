@@ -17,12 +17,14 @@ const lobbies = {};
 io.on('connection', (socket) => {
     console.log(`Client connected: ${socket.id}`);
 
+    socket.emit('onLobbyListChanged', Object.keys(lobbies));
+
     socket.on('createLobby', (lobbyName, username) => {
         if (lobbies[lobbyName]) {
             socket.emit('createLobbyResponse', lobbyName, 'Lobby already exists!');
             return;
         }
-
+        
         lobbies[lobbyName] = { players: [{ id: socket.id, name: username }] };
         socket.join(lobbyName);
         
