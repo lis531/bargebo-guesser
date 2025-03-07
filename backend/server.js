@@ -6,56 +6,75 @@ import cors from 'cors';
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: '*', 
-    methods: ['GET', 'POST']
-  }
+    cors: {
+        origin: '*',
+        methods: ['GET', 'POST']
+    }
 });
 
-const lobbies = {}; 
+const lobbies = {};
 
 io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.id}`);
+    console.log(`Client connected: ${socket.id}`);
 
-  socket.on('createLobby', (lobbyName, username) => {
-    if (lobbies[lobbyName]) {
-      socket.emit('lobbyError', 'Lobby already exists!');
-      return;
-    }
-    
-    lobbies[lobbyName] = { players: [socket.id] };
-    socket.join(lobbyName);
-    io.emit('lobbyList', Object.keys(lobbies));
-    socket.emit('lobbyCreated', lobbyName);
-    console.log(`Lobby created: ${lobbyName}, by: ${username}`);
-  });
+    socket.on('createLobby', (lobbyName, username) => {
+        if (lobbies[lobbyName]) {
+            socket.emit('createLobbyResponse', lobbyName, 'Lobby already exists!');
+            return;
+        }
 
-  socket.on('joinLobby', (lobbyName, username) => {
-    if (!lobbies[lobbyName]) {
-      socket.emit('lobbyError', 'Lobby does not exist!');
-      return;
-    }
+        lobbies[lobbyName] = { players: [{ id: socket.id, name: username }] };
+        socket.join(lobbyName);
+        
+        socket.emit('createLobbyResponse', lobbyName, '');
+        
+        io.emit('onLobbyListChanged', Object.keys(lobbies));
+        io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players);
 
-    lobbies[lobbyName].players.push(socket.id);
-    socket.join(lobbyName);
-    io.to(lobbyName).emit('lobbyJoined', lobbies[lobbyName].players);
-    console.log(`User ${username} joined lobby: ${lobbyName}`);
-  });
+        console.log(`Lobby created: ${lobbyName}, by: ${username}`);
+    });
 
-  socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.id}`);
+    socket.on('joinLobby', (lobbyName, username) => {
+        if (!lobbies[lobbyName]) {
+            socket.emit('joinLobbyResponse', 'Lobby does not exist!');
+            return;
+        }
 
-    for (const lobby in lobbies) {
-      lobbies[lobby].players = lobbies[lobby].players.filter(p => p !== socket.id);
-      if (lobbies[lobby].players.length === 0) {
-        delete lobbies[lobby];
-      }
-    }
+        for (var i = 0; i < lobbies[lobbyName].players.length; i++) {
+            if (lobbies[lobbyName].players[i].name === username) {
+                socket.emit('joinLobbyResponse', 'Player with this name already is in the lobby!');
+                return;
+            }
+            if (lobbies[lobbyName].players[i].id === socket.id) {
+                socket.emit('joinLobbyResponse', 'This client is already connected to the lobby!');
+                return;
+            }
+        }
 
-    io.emit('lobbyList', Object.keys(lobbies));
-  });
+        lobbies[lobbyName].players.push({ id: socket.id, name: username });
+        socket.join(lobbyName);
+
+        socket.emit('joinLobbyResponse', '');
+
+        io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players);
+
+        console.log(`User ${username} joined lobby: ${lobbyName}`);
+    });
+
+    socket.on('disconnect', () => {
+        for (const lobby in lobbies) {
+            lobbies[lobby].players = lobbies[lobby].players.filter(p => p.id !== socket.id);
+
+            io.to(lobby).emit('onPlayersChanged', lobbies[lobby].players);
+            if (lobbies[lobby].players.length === 0) { 
+                delete lobbies[lobby];
+
+                io.emit('onLobbyListChanged', Object.keys(lobbies));
+            }
+        }
+    });
 });
 
 server.listen(2137, () => {
-  console.log('Server running on port 2137');
+    console.log('Server running on port 2137');
 });

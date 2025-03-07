@@ -8,22 +8,41 @@ const socket = io("http://130.162.248.218:2137");
 function App() {
 	const [lobbyName, setLobbyName] = useState<string>("");
 	const [username, setUsername] = useState<string>("");
-	const [lobbies, setLobbies] = useState([]);
+	const [lobbyPlayers, setLobbyPlayers] = useState([]);
+	const [lobbyNames, setLobbyNames] = useState([]);
 	const [currentLobby, setCurrentLobby] = useState("");
 	const [selectedSong, setSelectedSong] = useState<{ id: string; title: string; artist: string } | null>(null);
 	const [songs, setSongs] = useState<{ id: string; title: string; artist: string; cover: string; }[]>([]);
 
 	useEffect(() => {
-		socket.on('lobbyList', (lobbies) => {
-			setLobbies(lobbies);
+		socket.on('onLobbyListChanged', (lobbyNames) => {
+			setLobbyNames(lobbyNames);
+
+			console.log("Lobby names changed: ", lobbyNames);
 		});
 
-		socket.on("lobbyCreated", (lobby) => {
-			setCurrentLobby(lobby);
+		socket.on('onPlayersChanged', (players) => {
+			setLobbyPlayers(players);
+
+			console.log("Players changed: ", players);
+		});
+	
+		socket.on("createLobbyResponse", (lobbyName, err) => {
+			if (err !== '') {
+				console.log("Error while creating a lobby: ", err);
+				return;
+			}
+
+			console.log("Successfully created a lobby called: ", lobbyName);
 		});
 
-		socket.on("lobbyJoined", (players) => {
-			console.log("Players in lobby:", players);
+		socket.on("joinLobbyResponse", (err) => {
+			if (err !== '') {
+				console.log("Error while joining a lobby: ", err);
+				return;
+			}
+
+			console.log("Successfully joined a lobby called: ", lobbyName);
 		});
 	}, [])
 
@@ -36,14 +55,13 @@ function App() {
 	const joinLobby = () => {
 		if (lobbyName && username) {
 			socket.emit("joinLobby", lobbyName, username);
-			setCurrentLobby(lobbyName);
 		}
 	};
 
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if (e.key === " ") {
-				console.log(lobbies);
+				console.log(lobbyNames);
 			}
 		};
 		window.addEventListener("keydown", handleKeyDown);
@@ -51,7 +69,7 @@ function App() {
 		return () => {
 			window.removeEventListener("keydown", handleKeyDown);
 		};
-	}, [lobbies]);
+	}, [lobbyNames]);
 
 	interface Artist {
 		name: string;
