@@ -20,11 +20,17 @@ function App() {
 
 			console.log("Lobby names changed: ", lobbyNames);
 		});
-
 		socket.on('onPlayersChanged', (players) => {
 			setLobbyPlayers(players);
 
 			console.log("Players changed: ", players);
+		});
+
+		socket.on('onRoundStart', (allSongs, correctIndex) => {
+			console.log("Starting round: ", allSongs, " correct: ", correctIndex);
+		});
+		socket.on('onRoundEnd', () => {
+			console.log("Ending round.");
 		});
 	
 		socket.on("createLobbyResponse", (lobbyName, err) => {
@@ -57,6 +63,14 @@ function App() {
 			socket.emit("joinLobby", lobbyName, username);
 		}
 	};
+
+	const startRound = () => {
+		socket.emit('announceRoundStart', lobbyName);
+	}
+
+	const submitAnswer = (choiceIndex: number) => {
+		socket.emit('submitAnswer', lobbyName, choiceIndex);
+	}
 
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
@@ -165,6 +179,7 @@ function App() {
 				<div className='start-screen-buttons'>
 					<button type="submit" onClick={() => joinLobby()}>Join Lobby</button>
 					<button type="submit" onClick={() => createLobby()}>Create Lobby</button>
+					<button type="submit" onClick={() => startRound()}>Start Round</button>
 				</div>
 			</div>
 			<SongPicker songs={songs} onSongSelect={onSongSelection} />

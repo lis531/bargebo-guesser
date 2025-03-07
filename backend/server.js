@@ -25,7 +25,7 @@ io.on('connection', (socket) => {
             return;
         }
         
-        lobbies[lobbyName] = { players: [{ id: socket.id, name: username }] };
+        lobbies[lobbyName] = { players: [{ id: socket.id, name: username, choice: -1 }], roundStarted: false };
         socket.join(lobbyName);
         
         socket.emit('createLobbyResponse', lobbyName, '');
@@ -53,7 +53,7 @@ io.on('connection', (socket) => {
             }
         }
 
-        lobbies[lobbyName].players.push({ id: socket.id, name: username });
+        lobbies[lobbyName].players.push({ id: socket.id, name: username, choice: -1 });
         socket.join(lobbyName);
 
         socket.emit('joinLobbyResponse', '');
@@ -61,6 +61,37 @@ io.on('connection', (socket) => {
         io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players);
 
         console.log(`User ${username} joined lobby: ${lobbyName}`);
+    });
+
+    socket.on('announceRoundStart', (lobbyName) => {
+        for (var i = 0; i < lobbies[lobbyName].players.length; i++) {
+            lobbies[lobbyName].players[i].choice = -1;
+        }
+
+        lobbies[lobbyName].roundStarted = true;
+
+        const allSongs = ['A', 'B', 'C', 'D']
+        const correctIndex = 1;
+
+        io.to(lobbyName).emit('onRoundStart', allSongs, correctIndex);
+    });
+    socket.on('submitAnswer', (lobbyName, choiceIndex) => {
+        if (lobbies[lobbyName].roundStarted === false) {
+            console.log(socket.id, ' was late...');
+            return;
+        }
+
+        for (var i = 0; i < lobbies[lobbyName].players.length; i++) {
+            if (lobbies[lobbyName].players[i].id === socket.id) {
+                lobbies[lobbyName].players[i].choice = choiceIndex;
+                return;
+            }
+        }
+    });
+    socket.on('announceRoundEnd', (lobbyName) => {
+        lobbies[lobbyName].roundStarted = false;
+
+        io.to(lobbyName).emit('onRoundEnd');
     });
 
     socket.on('disconnect', () => {
