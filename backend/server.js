@@ -87,13 +87,27 @@ async function downloadSong(videoUrl) {
         }
     });
     return new Promise((resolve, reject) => {
-        exec(`yt-dlp -x --audio-format mp3 -o "downloadedSong.%(ext)s" ${videoUrl}`, (error, stdout, stderr) => {
+        exec(`yt-dlp -x --audio-format mp3 --audio-quality 4 -o "downloadedSong.%(ext)s" ${videoUrl}`, (error, stdout, stderr) => {
             if (error) {
                 console.error(`Error downloading track: ${error.message}`);
                 reject(error);
             } else {
                 console.log(`Track downloaded: ${stdout}`);
                 resolve('downloadedSong.mp3');
+            }
+        });
+    });
+}
+
+async function trimSong() {
+    return new Promise((resolve, reject) => {
+        exec('ffmpeg -i downloadedSong.mp3 -y -ss 40 -to 60 -c copy final.mp3', (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Error converting track: ${error.message}`);
+                reject(error);
+            } else {
+                console.log(`Track converted: ${stdout}`);
+                resolve('final.mp3');
             }
         });
     });
@@ -166,9 +180,10 @@ io.on('connection', (socket) => {
         const query = allSongs[correctIndex].title + " " + allSongs[correctIndex].artist;
         const searchResults = await ytSearch(query);
         const videoUrl = searchResults.videos[0].url;
-        await downloadSong(videoUrl);
+        //await downloadSong(videoUrl);
+        await trimSong();
 
-        fs.readFile('./downloadedSong.mp3', (err, data) => {
+        fs.readFile('./final.mp3', (err, data) => {
             if (err !== null) {
                 console.log();
                 return;

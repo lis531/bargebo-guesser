@@ -57,7 +57,7 @@ function App() {
 				const source = context.createBufferSource();
 				source.buffer = buffer;
 				source.connect(context.destination);
-				source.start(0, 40.0, 30.0);
+				source.start();
 			}, (err) => { 
 				console.log("Playback error: " + err); 
 			})
