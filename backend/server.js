@@ -166,8 +166,16 @@ io.on('connection', (socket) => {
         const query = allSongs[correctIndex].title + " " + allSongs[correctIndex].artist;
         const searchResults = await ytSearch(query);
         const videoUrl = searchResults.videos[0].url;
-        io.to(lobbyName).emit('onSongDownloaded', await downloadSong(videoUrl));
-        io.to(lobbyName).emit('onRoundStart', allSongs, correctIndex);
+        await downloadSong(videoUrl);
+
+        fs.readFile('./downloadedSong.mp3', (err, data) => {
+            if (err !== null) {
+                console.log();
+                return;
+            } 
+            
+            io.to(lobbyName).emit('onRoundStart', allSongs, correctIndex, data);
+        });
     });
 
     socket.on('announceRoundEnd', (lobbyName) => {

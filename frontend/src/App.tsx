@@ -14,6 +14,7 @@ function App() {
 	const [currentLobby, setCurrentLobby] = useState("");
 	const [selectedSong, setSelectedSong] = useState<{ id: string; title: string; artist: string } | null>(null);
 	const [songs, setSongs] = useState<{ id: string; title: string; artist: string; cover: string; url: string; }[]>([]);
+	const [correctSongIndex, setCorrectSongIndex] = useState<number>();
 
 	useEffect(() => {
 		socket.on('onLobbyListChanged', (lobbyNames) => {
@@ -44,18 +45,26 @@ function App() {
 			console.log("Successfully joined a lobby called: ", lobbyName);
 		});
 
-		socket.on('onRoundStart', (allSongs, correctIndex) => {
+		socket.on('onRoundStart', (allSongs, correctIndex, correctSongData) => {
+			setCorrectSongIndex(correctIndex);
+
 			console.log("Starting round: ", allSongs, " correct index: ", correctIndex);
+
 			setSongs(allSongs);
+
+			const context = new AudioContext();
+			context.decodeAudioData(correctSongData, (buffer) => {
+				const source = context.createBufferSource();
+				source.buffer = buffer;
+				source.connect(context.destination);
+				source.start(0, 40.0, 30.0);
+			}, (err) => { 
+				console.log("Playback error: " + err); 
+			})
 		});
 
 		socket.on('onRoundEnd', () => {
 			console.log("Ending round.");
-		});
-
-		socket.on("onSongDownloaded", (correctSong) => {
-			const audio = new Audio(correctSong);
-			audio.play();
 		});
 	}, [])
 
@@ -114,6 +123,8 @@ function App() {
 					<button type="submit" onClick={() => startRound()}>Start Round</button>
 					<button type="submit" onClick={() => endRound()}>End Round</button>
 				</div>
+
+				<audio id="audio-player"></audio>
 			</div>
 			<SongPicker songs={songs} onSongSelect={onSongSelection} />
 		</div>
