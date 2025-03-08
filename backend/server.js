@@ -180,7 +180,7 @@ io.on('connection', (socket) => {
         const query = allSongs[correctIndex].title + " " + allSongs[correctIndex].artist;
         const searchResults = await ytSearch(query);
         const videoUrl = searchResults.videos[0].url;
-        //await downloadSong(videoUrl);
+        await downloadSong(videoUrl);
         await trimSong();
 
         fs.readFile('./final.mp3', (err, data) => {
