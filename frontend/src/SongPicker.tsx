@@ -2,20 +2,20 @@ import './SongPicker.css'
 
 interface Props {
     songs: {
-        id: string;
+        id: number;
         title: string;
         artist: string;
         cover: string;
         url: string;
     }[];
-    onSongSelect: (song: { id: string; title: string; artist: string; cover: string; url: string; }) => void;
+    onSongSelect: (song: { id: number; title: string; artist: string; cover: string; url: string; }) => void;
 }
 
 function SongPicker({ songs, onSongSelect }: Props) {
-    const songSelected = (song: { id: string; title: string; artist: string; cover: string; url: string }) => {
+    const songSelected = (song: { id: number; title: string; artist: string; cover: string; url: string }) => {
         let songsTiles = document.querySelectorAll(".song-picker-song") as NodeListOf<HTMLElement>;
         Array.from(songsTiles).map((tile) => {
-            if (tile.id == song.id && !tile.classList.contains("disabled")) {
+            if (tile.id == song.id.toString() && !tile.classList.contains("disabled")) {
                 tile.classList.add("selected");
                 onSongSelect(song);
             }
@@ -29,7 +29,7 @@ function SongPicker({ songs, onSongSelect }: Props) {
             <h1>Choose a song</h1>
             <div className="song-picker-songs">
                 {songs.map((song) => (
-                    <div key={song.id} id={song.id} className="song-picker-song" onClick={() => { songSelected(song) }}>
+                    <div key={song.id} id={song.id.toString()} className="song-picker-song" onClick={() => { songSelected(song) }}>
                         <img src={song.cover} alt="Song cover" />
                         <div className="song-info">
                             <p>{song.title}</p>

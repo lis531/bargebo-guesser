@@ -68,8 +68,8 @@ const fetchTracks = async () => {
         selectedTracks.push(randomTrack);
     }
 
-    const songs = selectedTracks.map(track => ({
-        id: track.id,
+    const songs = selectedTracks.map((track, index) => ({
+        id: index,
         title: track.name,
         artist: track.artists.map(artist => artist.name).join(', '),
         cover: track.album.images[0]?.url || '',

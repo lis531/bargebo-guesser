@@ -12,8 +12,8 @@ function App() {
 	const [lobbyPlayers, setLobbyPlayers] = useState([]);
 	const [lobbyNames, setLobbyNames] = useState([]);
 	const [currentLobby, setCurrentLobby] = useState("");
-	const [selectedSong, setSelectedSong] = useState<{ id: string; title: string; artist: string } | null>(null);
-	const [songs, setSongs] = useState<{ id: string; title: string; artist: string; cover: string; url: string; }[]>([]);
+	const [selectedSong, setSelectedSong] = useState<{ id: number; title: string; artist: string } | null>(null);
+	const [songs, setSongs] = useState<{ id: number; title: string; artist: string; cover: string; url: string; }[]>([]);
 	const [correctSongIndex, setCorrectSongIndex] = useState<number>();
 
 	useEffect(() => {
@@ -55,9 +55,12 @@ function App() {
 			const context = new AudioContext();
 			context.decodeAudioData(correctSongData, (buffer) => {
 				const source = context.createBufferSource();
+				const gainNode = context.createGain();
 				source.buffer = buffer;
-				source.connect(context.destination);
-				source.start();
+				gainNode.gain.value = 0.1;
+				source.connect(gainNode);
+				gainNode.connect(context.destination);
+				source.start(0, 40.0, 30.0);
 			}, (err) => { 
 				console.log("Playback error: " + err); 
 			})
@@ -105,8 +108,17 @@ function App() {
 		socket.emit('submitAnswer', lobbyName, choiceIndex);
 	}
 
-	const onSongSelection = (song: { id: string; title: string; artist: string; url: string }) => {
+	const onSongSelection = (song: { id: number; title: string; artist: string; url: string }) => {
 		setSelectedSong(song);
+		if(correctSongIndex == song.id) {
+			console.log("Correct answer!");
+			let songsTiles = document.querySelectorAll(".song-picker-song") as NodeListOf<HTMLElement>;
+			Array.from(songsTiles).map((tile) => {
+				if (Number(tile.id) == song.id) {
+					tile.classList.add("correct");
+				}
+			});
+		}
 	};
 
 	return (
@@ -126,7 +138,7 @@ function App() {
 
 				<audio id="audio-player"></audio>
 			</div>
-			<SongPicker songs={songs} onSongSelect={onSongSelection} />
+			<SongPicker songs={songs} onSongSelect={onSongSelection}/>
 		</div>
 	);
 }

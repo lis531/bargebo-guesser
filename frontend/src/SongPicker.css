@@ -42,6 +42,10 @@
     &.selected {
         background-color: #ffffff;
     }
+
+    &.correct {
+        background-color: #00ff00;
+    }
 }
 
 .song-info {
