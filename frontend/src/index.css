@@ -66,7 +66,7 @@ button:focus-visible {
     outline: 4px auto -webkit-focus-ring-color;
 }
 
-input {
+input[type='text'] {
     padding: 0.5em;
     border-radius: 8px;
     border: 2px solid transparent;
@@ -81,6 +81,10 @@ input {
     &:focus {
         border-color: #646cff;
     }
+}
+
+input[type='range'] {
+    cursor: pointer;
 }
 
 @media (prefers-color-scheme: light) {

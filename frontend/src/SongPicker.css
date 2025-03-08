@@ -42,9 +42,11 @@
     &.selected {
         background-color: #ffffff;
     }
-
     &.correct {
         background-color: #00ff00;
+    }
+    &.incorrect {
+        background-color: #ff0000;
     }
 }
 

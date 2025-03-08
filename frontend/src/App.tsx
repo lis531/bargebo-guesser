@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './App.css';
 import SongPicker from './SongPicker.tsx';
 import { io } from "socket.io-client";
@@ -15,6 +15,8 @@ function App() {
 	const [selectedSong, setSelectedSong] = useState<{ id: number; title: string; artist: string } | null>(null);
 	const [songs, setSongs] = useState<{ id: number; title: string; artist: string; cover: string; url: string; }[]>([]);
 	const [correctSongIndex, setCorrectSongIndex] = useState<number>();
+	const audioContextRef = useRef<AudioContext | null>(null);
+	const gainNodeRef = useRef<GainNode | null>(null);	
 
 	useEffect(() => {
 		socket.on('onLobbyListChanged', (lobbyNames) => {
@@ -47,24 +49,25 @@ function App() {
 
 		socket.on('onRoundStart', (allSongs, correctIndex, correctSongData) => {
 			setCorrectSongIndex(correctIndex);
-
-			console.log("Starting round: ", allSongs, " correct index: ", correctIndex);
-
 			setSongs(allSongs);
+		
+			audioContextRef.current = new AudioContext();
+			gainNodeRef.current = audioContextRef.current.createGain();
+			gainNodeRef.current.gain.value = 0.25;
+			gainNodeRef.current.connect(audioContextRef.current.destination);
 
-			const context = new AudioContext();
-			context.decodeAudioData(correctSongData, (buffer) => {
-				const source = context.createBufferSource();
-				const gainNode = context.createGain();
+			if (!audioContextRef.current || !gainNodeRef.current) return;
+		
+			audioContextRef.current.decodeAudioData(correctSongData, (buffer) => {
+				const source = audioContextRef.current!.createBufferSource();
 				source.buffer = buffer;
-				gainNode.gain.value = 0.1;
-				source.connect(gainNode);
-				gainNode.connect(context.destination);
+				source.connect(gainNodeRef.current!);
 				source.start(0, 40.0, 30.0);
-			}, (err) => { 
-				console.log("Playback error: " + err); 
-			})
+			}, (err) => {
+				console.log("Playback error: " + err);
+			});
 		});
+		
 
 		socket.on('onRoundEnd', () => {
 			console.log("Ending round.");
@@ -110,16 +113,27 @@ function App() {
 
 	const onSongSelection = (song: { id: number; title: string; artist: string; url: string }) => {
 		setSelectedSong(song);
+		let songsTiles = document.querySelectorAll(".song-picker-song") as NodeListOf<HTMLElement>;
 		if(correctSongIndex == song.id) {
-			console.log("Correct answer!");
-			let songsTiles = document.querySelectorAll(".song-picker-song") as NodeListOf<HTMLElement>;
 			Array.from(songsTiles).map((tile) => {
 				if (Number(tile.id) == song.id) {
 					tile.classList.add("correct");
 				}
 			});
+		} else {
+			Array.from(songsTiles).map((tile) => {
+				if (Number(tile.id) == song.id) {
+					tile.classList.add("incorrect");
+				}
+			});
 		}
 	};
+
+    const changeVolume = (volume: number) => {
+        if (gainNodeRef.current) {
+            gainNodeRef.current.gain.value = volume / 200;
+        }
+    }
 
 	return (
 		<div className="start-screen">
@@ -135,8 +149,8 @@ function App() {
 					<button type="submit" onClick={() => startRound()}>Start Round</button>
 					<button type="submit" onClick={() => endRound()}>End Round</button>
 				</div>
-
-				<audio id="audio-player"></audio>
+				<label htmlFor="volume">Volume</label>
+				<input id="volume" type='range' min={0} max={100} step={1} onChange={(e) => changeVolume(parseInt(e.target.value))}/>
 			</div>
 			<SongPicker songs={songs} onSongSelect={onSongSelection}/>
 		</div>
