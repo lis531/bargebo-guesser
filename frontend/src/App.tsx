@@ -13,7 +13,7 @@ function App() {
 	const [lobbyNames, setLobbyNames] = useState([]);
 	const [currentLobby, setCurrentLobby] = useState("");
 	const [selectedSong, setSelectedSong] = useState<number>();
-	const [songs, setSongs] = useState<{ id: number; title: string; artist: string; cover: string; url: string; }[]>([]);
+	const [songs, setSongs] = useState<{ title: string; artist: string; cover: string; }[]>([]);
 	const [correctSongIndex, setCorrectSongIndex] = useState<number>();
 	const audioContextRef = useRef<AudioContext | null>(null);
 	const gainNodeRef = useRef<GainNode | null>(null);	
@@ -59,6 +59,7 @@ function App() {
 				sourceAudioBufferRef.current.stop();
 				sourceAudioBufferRef.current = null;
 			}
+			resetSongSelection();
 
 			setSelectedSong(-1);
 			setCorrectSongIndex(correctIndex);
@@ -108,22 +109,32 @@ function App() {
 		socket.emit('submitAnswer', lobbyName, choiceIndex);
 	}
 
-	const onSongSelection = (song: { id: number; title: string; artist: string; url: string }) => {
-		setSelectedSong(song.id);
+	const resetSongSelection = () => {
+		const songsTiles = document.querySelectorAll(".song-picker-song") as NodeListOf<HTMLElement>;
+		Array.from(songsTiles).map((tile) => {
+			tile.classList.remove("selected");
+			tile.classList.remove("disabled");
+			tile.classList.remove("correct");
+			tile.classList.remove("incorrect");
+		});
+	}
 
-		submitAnswer(song.id);
+	const onSongSelection = (index: number) => {
+		setSelectedSong(index);
+
+		submitAnswer(index);
 
 		const songsTiles = document.querySelectorAll(".song-picker-song") as NodeListOf<HTMLElement>;
 
-		if(correctSongIndex == song.id) {
+		if(correctSongIndex == index) {
 			Array.from(songsTiles).map((tile) => {
-				if (Number(tile.id) == song.id) {
+				if (Number(tile.id) == index) {
 					tile.classList.add("correct");
 				}
 			});
 		} else {
 			Array.from(songsTiles).map((tile) => {
-				if (Number(tile.id) == song.id) {
+				if (Number(tile.id) == index) {
 					tile.classList.add("incorrect");
 				}
 			});

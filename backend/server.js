@@ -54,29 +54,28 @@ async function fetchSpotifyAPI(endpoint, method, body) {
 }
 
 async function fetchTracks() {
-    const allTracks = await fetchSpotifyAPI('v1/search?q=track&type=track&limit=50', 'GET');
+    const allTracks = [];
+    const totalSongs = 1000;
+    const limit = 50;
 
-    let popularTracks = [];
+    for (let offset = 0; offset < totalSongs; offset += limit) {
+        const response = await fetchSpotifyAPI(`v1/search?q=track&type=track&limit=${limit}&offset=${offset}&market=US`, 'GET');
+        allTracks.push(...response.tracks.items);
+    }
 
-    // losuje poki znajdzie co najmniej NUM_SONGS_TO_GUESS kandydatow
     let popularityMargin = 60;
-    while (popularTracks.length < NUM_SONGS_TO_GUESS) {
-        console.log("Fetching tracks with popularity of at least ", popularityMargin);
-        popularTracks = allTracks.tracks.items.filter((track) => track.popularity > popularityMargin);
 
-        popularityMargin -= 10;
+    console.log(`Fetched ${allTracks.length} tracks`);
+    const popularTracks = allTracks.filter(track => track.popularity > popularityMargin) || [];
+    console.log(`Filtered ${popularTracks.length} popular tracks`);
+
+    // sortowanie rasowe
+    function isEnglish(text) {
+        return /^[A-Za-z0-9\s.,'!?()-]+$/.test(text);
     }
+    const englishTracks = popularTracks.filter(track => isEnglish(track.name) && isEnglish(track.artists.map(a => a.name).join(' ')));
 
-    const selectedTracks = [];
-    for (let i = 0; i < NUM_SONGS_TO_GUESS; i++) {
-        const randomIndex = Math.floor(Math.random() * popularTracks.length);
-        const randomTrack = popularTracks[randomIndex];
-
-        selectedTracks.push(randomTrack);
-        popularTracks.splice(randomIndex, 1); // Usuwa wybrana piosenke z kandydatow zeby nie bylo powtorzen
-    }
-
-    const songs = selectedTracks.map((track, index) => ({
+    const songs = englishTracks.map((track, index) => ({
         id: index,
         title: track.name,
         artist: track.artists.map(artist => artist.name).join(', '),
@@ -85,7 +84,19 @@ async function fetchTracks() {
     }));
 
     return songs;
-};
+}
+
+async function selectTracks (allTracks) {
+    const selectedTracks = [];
+
+    for (let i = 0; i < NUM_SONGS_TO_GUESS; i++) {
+        const randomIndex = Math.floor(Math.random() * allTracks.length);
+        const randomTrack = allTracks[randomIndex];
+        selectedTracks.push(randomTrack);
+    }
+
+    return selectedTracks;
+}
 
 async function downloadSong(videoUrl) {
     fs.unlink('downloadedSong.mp3', (err) => {
@@ -125,10 +136,13 @@ async function trimSong() {
 
 io.on('connection', (socket) => {
     console.log(`Client connected: ${socket.id}`);
+    let allSongs = [];
 
     socket.emit('onLobbyListChanged', Object.keys(lobbies));
 
-    socket.on('createLobby', (lobbyName, username) => {
+    socket.on('createLobby', async (lobbyName, username) => {
+        allSongs = await fetchTracks();
+
         if (lobbies[lobbyName]) {
             socket.emit('createLobbyResponse', lobbyName, 'Lobby already exists!');
             return;
@@ -182,10 +196,10 @@ io.on('connection', (socket) => {
 
         lobbies[lobbyName].roundStarted = true;
 
-        const allSongs = await fetchTracks();
-        const correctIndex = Math.floor(Math.random() * allSongs.length);
+        const selectedTracks = await selectTracks(allSongs);
+        const correctIndex = Math.floor(Math.random() * selectedTracks.length);
 
-        const query = allSongs[correctIndex].title + " " + allSongs[correctIndex].artist;
+        const query = selectedTracks[correctIndex].title + " " + selectedTracks[correctIndex].artist;
         const searchResults = await ytSearch(query);
         const videoUrl = searchResults.videos[0].url;
         
@@ -198,7 +212,7 @@ io.on('connection', (socket) => {
                 return;
             } 
             
-            io.to(lobbyName).emit('onRoundStart', allSongs, correctIndex, data);
+            io.to(lobbyName).emit('onRoundStart', selectedTracks, correctIndex, data);
         });
     });
 
