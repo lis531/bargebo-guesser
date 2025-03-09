@@ -7,6 +7,7 @@ import { exec } from 'child_process';
 import fs from 'fs';
 
 const NUM_SONGS_TO_GUESS = 4;
+const LAST_FM_API_KEY = 'a9a79c6c24df636090cfa7ee4fa2c040';
 
 const app = express();
 app.use(cors());
@@ -18,8 +19,6 @@ const io = new Server(server, {
         methods: ['GET', 'POST']
     }
 });
-
-const lobbies = {};
 
 async function getAccessToken() {
     const clientId = 'b8156c11c6ca4c32b541d3392225aed3';
@@ -35,7 +34,6 @@ async function getAccessToken() {
     });
 
     const data = await response.json();
-
     return data.access_token;
 }
 
@@ -49,52 +47,62 @@ async function fetchSpotifyAPI(endpoint, method, body) {
         method,
         body: body ? JSON.stringify(body) : undefined,
     });
-
     return await res.json();
 }
 
+async function getSpotifyCover(title, artist) {
+    try {
+        const query = `track:${title} artist:${artist}`;
+        const response = await fetchSpotifyAPI(`v1/search?q=${encodeURIComponent(query)}&type=track&market=US&limit=1`, 'GET');
+        if (response.tracks && response.tracks.items && response.tracks.items.length > 0) {
+            return response.tracks.items[0].album.images[0]?.url || '';
+        }
+    } catch (err) {
+        console.error("Error getting Spotify cover:", err);
+    }
+    return '';
+}
+
+const lobbies = {};
+
 async function fetchTracks() {
-    const allTracks = [];
     const totalSongs = 1000;
     const limit = 50;
+    const totalPages = 20;
+    let allTracks = [];
 
-    for (let offset = 0; offset < totalSongs; offset += limit) {
-        const response = await fetchSpotifyAPI(`v1/search?q=track&type=track&limit=${limit}&offset=${offset}&market=US`, 'GET');
-        allTracks.push(...response.tracks.items);
+    for (let page = 1; page <= totalPages; page++) {
+        const url = `http://ws.audioscrobbler.com/2.0/?method=chart.gettoptracks&api_key=${LAST_FM_API_KEY}&format=json&limit=${limit}&page=${page}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        if (data.tracks && data.tracks.track) {
+            allTracks.push(...data.tracks.track);
+        }
     }
 
-    let popularityMargin = 60;
+    console.log(`Fetched ${allTracks.length} tracks from Last.fm`);
 
-    console.log(`Fetched ${allTracks.length} tracks`);
-    const popularTracks = allTracks.filter(track => track.popularity > popularityMargin) || [];
-    console.log(`Filtered ${popularTracks.length} popular tracks`);
-
-    // sortowanie rasowe
-    function isEnglish(text) {
-        return /^[A-Za-z0-9\s.,'!?()-]+$/.test(text);
-    }
-    const englishTracks = popularTracks.filter(track => isEnglish(track.name) && isEnglish(track.artists.map(a => a.name).join(' ')));
-
-    const songs = englishTracks.map((track, index) => ({
-        id: index,
+    const songs = allTracks.map(track => ({
         title: track.name,
-        artist: track.artists.map(artist => artist.name).join(', '),
-        cover: track.album.images[0]?.url || '',
-        url: track.external_urls.spotify,
+        artist: track.artist.name,
+        cover: '',
+        url: track.url,
     }));
 
     return songs;
 }
 
-async function selectTracks (allTracks) {
+async function selectTracks(allTracks) {
     const selectedTracks = [];
-
     for (let i = 0; i < NUM_SONGS_TO_GUESS; i++) {
         const randomIndex = Math.floor(Math.random() * allTracks.length);
-        const randomTrack = allTracks[randomIndex];
-        selectedTracks.push(randomTrack);
+        selectedTracks.push(allTracks[randomIndex]);
     }
 
+    for (let track of selectedTracks) {
+        track.cover = await getSpotifyCover(track.title, track.artist);
+    }
+  
     return selectedTracks;
 }
 
@@ -211,7 +219,6 @@ io.on('connection', (socket) => {
                 console.log();
                 return;
             } 
-            
             io.to(lobbyName).emit('onRoundStart', selectedTracks, correctIndex, data);
         });
     });
