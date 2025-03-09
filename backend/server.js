@@ -6,8 +6,11 @@ import ytSearch from 'yt-search';
 import { exec } from 'child_process';
 import fs from 'fs';
 
+const NUM_SONGS_TO_GUESS = 4;
+
 const app = express();
 app.use(cors());
+
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
@@ -32,10 +35,11 @@ async function getAccessToken() {
     });
 
     const data = await response.json();
+
     return data.access_token;
 }
 
-async function fetchWebApi(endpoint, method, body) {
+async function fetchSpotifyAPI(endpoint, method, body) {
     const token = await getAccessToken();
     const res = await fetch(`https://api.spotify.com/${endpoint}`, {
         headers: {
@@ -49,23 +53,27 @@ async function fetchWebApi(endpoint, method, body) {
     return await res.json();
 }
 
-async function getPopularTracks() {
-    const data = await fetchWebApi('v1/search?q=track&type=track&limit=50', 'GET');
-    const popularTracks = data.tracks.items.filter((track) => track.popularity > 50);
-    return popularTracks;
-}
+async function fetchTracks() {
+    const allTracks = await fetchSpotifyAPI('v1/search?q=track&type=track&limit=50', 'GET');
 
-const fetchTracks = async () => {
-    const popularTracks = await getPopularTracks();
-    if (popularTracks.length === 0) {
-        console.log('No tracks found with popularity > 50.');
-        return [];
+    let popularTracks = [];
+
+    // losuje poki znajdzie co najmniej NUM_SONGS_TO_GUESS kandydatow
+    let popularityMargin = 60;
+    while (popularTracks.length < NUM_SONGS_TO_GUESS) {
+        console.log("Fetching tracks with popularity of at least ", popularityMargin);
+        popularTracks = allTracks.tracks.items.filter((track) => track.popularity > popularityMargin);
+
+        popularityMargin -= 10;
     }
 
     const selectedTracks = [];
-    for (let i = 0; i < 4; i++) {
-        const randomTrack = popularTracks[Math.floor(Math.random() * popularTracks.length)];
+    for (let i = 0; i < NUM_SONGS_TO_GUESS; i++) {
+        const randomIndex = Math.floor(Math.random() * popularTracks.length);
+        const randomTrack = popularTracks[randomIndex];
+
         selectedTracks.push(randomTrack);
+        popularTracks.splice(randomIndex, 1); // Usuwa wybrana piosenke z kandydatow zeby nie bylo powtorzen
     }
 
     const songs = selectedTracks.map((track, index) => ({
@@ -75,6 +83,7 @@ const fetchTracks = async () => {
         cover: track.album.images[0]?.url || '',
         url: track.external_urls.spotify,
     }));
+
     return songs;
 };
 
@@ -86,8 +95,9 @@ async function downloadSong(videoUrl) {
             console.log('File removed');
         }
     });
+    
     return new Promise((resolve, reject) => {
-        exec(`yt-dlp -x --audio-format mp3 --audio-quality 4 -o "downloadedSong.%(ext)s" ${videoUrl}`, (error, stdout, stderr) => {
+        exec(`yt-dlp -x --download-sections "*0:40-0:50" --audio-format mp3 --audio-quality 4 -o "downloadedSong.%(ext)s" ${videoUrl}`, (error, stdout, stderr) => {
             if (error) {
                 console.error(`Error downloading track: ${error.message}`);
                 reject(error);
@@ -173,17 +183,16 @@ io.on('connection', (socket) => {
         lobbies[lobbyName].roundStarted = true;
 
         const allSongs = await fetchTracks();
-        const correctIndex = 1;
-
-        console.log();
+        const correctIndex = Math.floor(Math.random() * allSongs.length);
 
         const query = allSongs[correctIndex].title + " " + allSongs[correctIndex].artist;
         const searchResults = await ytSearch(query);
         const videoUrl = searchResults.videos[0].url;
+        
         await downloadSong(videoUrl);
-        await trimSong();
+        //await trimSong();
 
-        fs.readFile('./final.mp3', (err, data) => {
+        fs.readFile('./downloadedSong.mp3', (err, data) => {
             if (err !== null) {
                 console.log();
                 return;

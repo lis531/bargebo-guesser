@@ -12,13 +12,20 @@ function App() {
 	const [lobbyPlayers, setLobbyPlayers] = useState([]);
 	const [lobbyNames, setLobbyNames] = useState([]);
 	const [currentLobby, setCurrentLobby] = useState("");
-	const [selectedSong, setSelectedSong] = useState<{ id: number; title: string; artist: string } | null>(null);
+	const [selectedSong, setSelectedSong] = useState<number>();
 	const [songs, setSongs] = useState<{ id: number; title: string; artist: string; cover: string; url: string; }[]>([]);
 	const [correctSongIndex, setCorrectSongIndex] = useState<number>();
 	const audioContextRef = useRef<AudioContext | null>(null);
 	const gainNodeRef = useRef<GainNode | null>(null);	
+	const sourceAudioBufferRef = useRef<AudioBufferSourceNode | null>(null);	
 
 	useEffect(() => {
+		audioContextRef.current = new AudioContext();
+
+		gainNodeRef.current = audioContextRef.current.createGain();
+		gainNodeRef.current.gain.value = 0.25;
+		gainNodeRef.current.connect(audioContextRef.current.destination);
+
 		socket.on('onLobbyListChanged', (lobbyNames) => {
 			setLobbyNames(lobbyNames);
 			console.log("Lobby names changed: ", lobbyNames);
@@ -48,28 +55,31 @@ function App() {
 		});
 
 		socket.on('onRoundStart', (allSongs, correctIndex, correctSongData) => {
+			if (sourceAudioBufferRef.current !== null) {
+				sourceAudioBufferRef.current.stop();
+				sourceAudioBufferRef.current = null;
+			}
+
+			setSelectedSong(-1);
 			setCorrectSongIndex(correctIndex);
 			setSongs(allSongs);
-		
-			audioContextRef.current = new AudioContext();
-			gainNodeRef.current = audioContextRef.current.createGain();
-			gainNodeRef.current.gain.value = 0.25;
-			gainNodeRef.current.connect(audioContextRef.current.destination);
 
-			if (!audioContextRef.current || !gainNodeRef.current) return;
-		
-			audioContextRef.current.decodeAudioData(correctSongData, (buffer) => {
-				const source = audioContextRef.current!.createBufferSource();
-				source.buffer = buffer;
-				source.connect(gainNodeRef.current!);
-				source.start(0, 40.0, 30.0);
+			audioContextRef.current!.decodeAudioData(correctSongData, (buffer) => {
+				sourceAudioBufferRef.current = audioContextRef.current!.createBufferSource();
+				sourceAudioBufferRef.current.connect(gainNodeRef.current!);
+				sourceAudioBufferRef.current.buffer = buffer;
+				sourceAudioBufferRef.current.start();
 			}, (err) => {
 				console.log("Playback error: " + err);
 			});
 		});
 		
-
 		socket.on('onRoundEnd', () => {
+			if (sourceAudioBufferRef.current !== null) {
+				sourceAudioBufferRef.current.stop();
+				sourceAudioBufferRef.current = null;
+			}
+
 			console.log("Ending round.");
 		});
 	}, [])
@@ -86,19 +96,6 @@ function App() {
 		}
 	};
 
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
-			if (e.key === " ") {
-				console.log(lobbyNames);
-			}
-		};
-		window.addEventListener("keydown", handleKeyDown);
-
-		return () => {
-			window.removeEventListener("keydown", handleKeyDown);
-		};
-	}, [lobbyNames]);
-
 	const startRound = () => {
 		socket.emit('announceRoundStart', lobbyName);
 	}
@@ -112,8 +109,12 @@ function App() {
 	}
 
 	const onSongSelection = (song: { id: number; title: string; artist: string; url: string }) => {
-		setSelectedSong(song);
-		let songsTiles = document.querySelectorAll(".song-picker-song") as NodeListOf<HTMLElement>;
+		setSelectedSong(song.id);
+
+		submitAnswer(song.id);
+
+		const songsTiles = document.querySelectorAll(".song-picker-song") as NodeListOf<HTMLElement>;
+
 		if(correctSongIndex == song.id) {
 			Array.from(songsTiles).map((tile) => {
 				if (Number(tile.id) == song.id) {
