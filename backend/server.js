@@ -40,31 +40,10 @@ async function fetchTracks() {
     const songs = allTracks.map(track => ({
         title: track.name,
         artist: track.artist.name,
-        cover: '',
-        url: ''
+        id: ''
     }));
 
     return songs;
-}
-
-async function selectTracks(allTracks) {
-    const selectedTracks = [];
-    for (let i = 0; i < NUM_SONGS_TO_GUESS; i++) {
-        const randomIndex = Math.floor(Math.random() * allTracks.length);
-        selectedTracks.push(allTracks[randomIndex]);
-    }
-
-    const results = await Promise.all(selectedTracks.map(track => ytSearch(track.title + " " + track.artist)));
-
-    for (let i = 0; i < NUM_SONGS_TO_GUESS; i++) {
-        const videoURL = results[i].videos[0].url;
-        const videoID = videoURL.split('watch?v=')[1];
-
-        selectedTracks[i].cover = `https://img.youtube.com/vi/${videoID}/0.jpg`;
-        selectedTracks[i].url = videoURL;
-    }
-
-    return selectedTracks;
 }
 
 async function downloadSong(videoUrl, lobbyName) {    
@@ -81,9 +60,52 @@ async function downloadSong(videoUrl, lobbyName) {
     });
 }
 
+async function updateSongDB() {
+    let allSongs = await fetchTracks();
+
+    const BLOCK_SIZE = 100;
+    for (let blockID = 0; blockID < Math.ceil(allSongs.length / BLOCK_SIZE); blockID++) {
+        console.log("Starting block " + blockID + " at i=" + (blockID * BLOCK_SIZE));
+
+        const promises = [];
+        for (let i = blockID * BLOCK_SIZE, j = 0; i < allSongs.length, j < BLOCK_SIZE; i++, j++) {
+            const query = allSongs[i].title + " " + allSongs[i].artist;
+            promises.push(ytSearch(query));
+        }
+
+        for (let i = blockID * BLOCK_SIZE, j = 0; i < allSongs.length, j < BLOCK_SIZE; i++, j++) {
+            const result = await promises[j];
+            const videoURL = result.videos[0].url;
+            const videoID = videoURL.split('watch?v=')[1];
+            allSongs[i].id = videoID;
+    
+            if((i+1) % 10 === 0) {
+                console.log("Processed " + (i + 1) + " out of " + allSongs.length + " songs.")
+            }
+        }
+    }
+
+    fs.writeFile('db.json', JSON.stringify(allSongs), (err) => {
+        if (err) {
+            console.error('Error writing file:', err);
+        } else {
+            console.log('File written successfully!');
+        }
+    });
+}
+
+//await updateSongDB();
+
 const lobbies = {};
 
-let allSongs = await fetchTracks();
+const allSongs = JSON.parse(fs.readFileSync(`./db.json`, 'utf8'));
+for (let i = 0; i < allSongs.length; i++) {
+    allSongs[i].cover = `https://img.youtube.com/vi/${allSongs[i].id}/0.jpg`;
+    allSongs[i].url = `https://www.youtube.com/watch?v=${allSongs[i].id}`;
+    delete allSongs[i].id;
+}
+
+console.log("Loaded the songs DB of " + allSongs.length + " songs.");
 
 io.on('connection', (socket) => {
     console.log(`Client connected: ${socket.id}`);
@@ -145,7 +167,12 @@ io.on('connection', (socket) => {
         lobbies[lobbyName].roundStarted = true;
 
         console.log("Selecting tracks...");
-        const selectedTracks = await selectTracks(allSongs);
+        const selectedTracks = [];
+        for (let i = 0; i < NUM_SONGS_TO_GUESS; i++) {
+            const randomIndex = Math.floor(Math.random() * allSongs.length);
+            
+            selectedTracks.push(allSongs[randomIndex]);
+        }
 
         console.log(selectedTracks);
 
