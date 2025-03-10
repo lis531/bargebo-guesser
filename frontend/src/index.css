@@ -92,6 +92,10 @@ input[type='range'] {
     cursor: pointer;
 }
 
+.hidden {
+    display: none !important;
+}
+
 @media (prefers-color-scheme: light) {
     :root {
         color: #213547;

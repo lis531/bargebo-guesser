@@ -16,7 +16,6 @@ function Leaderboard(props: { players: Player[] }) {
             <h2>Leaderboard</h2>
             <div className="leaderboard-players">
                 {players.sort((a, b) => a.score - b.score).map((player, index) => {
-                    console.log(player);
                     return (
                         <div key={index} className="leaderboard-player">
                             <span>

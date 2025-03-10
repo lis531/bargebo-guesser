@@ -42,7 +42,14 @@
 	.start-screen-inputs {
 		display: flex;
 		flex-direction: column;
-		gap: 1em;
+		& > label {
+			text-indent: 0.3em;
+			margin-bottom: 0.1em;
+			font-size: large;
+		}
+		& > input {
+			margin-bottom: 1em;
+		}
 	}
 
 	.start-screen-buttons {

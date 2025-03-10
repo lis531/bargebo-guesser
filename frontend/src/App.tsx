@@ -16,8 +16,9 @@ function App() {
 	const [selectedSong, setSelectedSong] = useState<number>();
 	const [songs, setSongs] = useState<{ title: string; artist: string; cover: string; url: string; }[]>([]);
 	const [correctSongIndex, setCorrectSongIndex] = useState<number>();
+	const [initialVolume, setInitialVolume] = useState<number>(Number(localStorage.getItem('volume')) || 50);
 	const audioContextRef = useRef<AudioContext | null>(null);
-	const gainNodeRef = useRef<GainNode | null>(null);	
+	const gainNodeRef = useRef<GainNode | null>(null);
 	const sourceAudioBufferRef = useRef<AudioBufferSourceNode | null>(null);	
 
 	useEffect(() => {
@@ -26,6 +27,8 @@ function App() {
 		gainNodeRef.current = audioContextRef.current.createGain();
 		gainNodeRef.current.gain.value = 0.25;
 		gainNodeRef.current.connect(audioContextRef.current.destination);
+
+		changeVolume(initialVolume);
 
 		socket.on('onLobbyListChanged', (lobbyNames) => {
 			setLobbyNames(lobbyNames);
@@ -43,6 +46,7 @@ function App() {
 				return;
 			}
 
+			document.querySelector(".start-screen-inputs")!.classList.add("hidden");
 			console.log("Successfully created a lobby called: ", lobbyName);
 		});
 
@@ -74,6 +78,18 @@ function App() {
 			}, (err) => {
 				console.log("Playback error: " + err);
 			});
+
+			const timer = document.querySelector('.timer') as HTMLElement;
+			timer.classList.remove('hidden');
+			let timerValue = 0;
+			const timeInterval = setInterval(() => {
+				timerValue++;
+				timer.innerText = "Timer: " + (timerValue).toString();
+			}, 1000);
+
+			setTimeout(() => {
+				clearInterval(timeInterval);
+			}, 20000);
 		});
 		
 		socket.on('onRoundEnd', () => {
@@ -107,7 +123,7 @@ function App() {
 	}
 
 	const submitAnswer = (choiceIndex: number) => {
-		socket.emit('submitAnswer', lobbyName, choiceIndex);
+		socket.emit('submitAnswer', lobbyName, username, choiceIndex);
 	}
 
 	const resetSongSelection = () => {
@@ -143,6 +159,7 @@ function App() {
 	};
 
     const changeVolume = (volume: number) => {
+		localStorage.setItem('volume', volume.toString());
         if (gainNodeRef.current) {
             gainNodeRef.current.gain.value = volume / 200;
         }
@@ -155,8 +172,11 @@ function App() {
 				<div className="start-screen">
 					<h1>BARGEBO GUESSER</h1>
 					<div>
+						<h1 className='timer hidden'>Timer: 0</h1>
 						<div className='start-screen-inputs'>
+							<label>Username:</label>
 							<input placeholder="username" name="usernameInput" value={username} onChange={(e) => setUsername(e.target.value)} type="text" />
+							<label>Lobby Name:</label>
 							<input placeholder="lobby name" name="lobbyInput" value={lobbyName} onChange={(e) => setLobbyName(e.target.value)} type="text" />
 						</div>
 						<div className='start-screen-buttons'>
@@ -166,7 +186,7 @@ function App() {
 							<button type="submit" onClick={() => endRound()}>End Round</button>
 						</div>
 						<label htmlFor="volume">Volume</label>
-						<input id="volume" type='range' min={0} max={100} step={1} onChange={(e) => changeVolume(parseInt(e.target.value))}/>
+						<input id="volume" type='range' defaultValue={initialVolume} min={0} max={100} step={1} onChange={(e) => changeVolume(parseInt(e.target.value))}/>
 					</div>
 					<SongPicker songs={songs} onSongSelect={onSongSelection}/>
 				</div>
