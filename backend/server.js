@@ -54,15 +54,14 @@ async function selectTracks(allTracks) {
         selectedTracks.push(allTracks[randomIndex]);
     }
 
-    for (let i = 0; i < NUM_SONGS_TO_GUESS; i++) {
-        const query = selectedTracks[i].title + " " + selectedTracks[i].artist;
-        const searchResult = await ytSearch(query);
-        const videoURL = searchResult.videos[0].url;
+    const results = await Promise.all(selectedTracks.map(track => ytSearch(track.title + " " + track.artist)));
 
-        const videoID = videoURL.split('watch?v=')[1]
-        
-        selectedTracks[i].url = videoURL;
+    for (let i = 0; i < NUM_SONGS_TO_GUESS; i++) {
+        const videoURL = results[i].videos[0].url;
+        const videoID = videoURL.split('watch?v=')[1];
+
         selectedTracks[i].cover = `https://img.youtube.com/vi/${videoID}/0.jpg`;
+        selectedTracks[i].url = videoURL;
     }
 
     return selectedTracks;
@@ -110,7 +109,7 @@ io.on('connection', (socket) => {
         console.log(`Lobby created: ${lobbyName}, by: ${username}`);
     });
 
-    socket.on('joinLobby', (lobbyName, username) => {
+    socket.on('joinLobby', async (lobbyName, username) => {
         if (!lobbies[lobbyName]) {
             socket.emit('joinLobbyResponse', 'Lobby does not exist!');
             return;
@@ -145,17 +144,19 @@ io.on('connection', (socket) => {
 
         lobbies[lobbyName].roundStarted = true;
 
+        console.log("Selecting tracks...");
         const selectedTracks = await selectTracks(allSongs);
-        console.log(selectedTracks);
-        const correctIndex = Math.floor(Math.random() * selectedTracks.length);
 
-        const query = selectedTracks[correctIndex].title + " " + selectedTracks[correctIndex].artist;
-        const searchResult = await ytSearch(query);
-        const correctVideoUrl = searchResult.videos[0].url;
+        console.log(selectedTracks);
+
+        const correctIndex = Math.floor(Math.random() * selectedTracks.length);
+        const correctVideoUrl = selectedTracks[correctIndex].url;
         
         console.log("Starting download...");
-        
+
         await downloadSong(correctVideoUrl, lobbyName);
+
+        console.log("Starting round...");
 
         fs.readFile(`./${lobbyName}.mp3`, (err, data) => {
             if (err !== null) {
@@ -166,13 +167,13 @@ io.on('connection', (socket) => {
         });
     });
 
-    socket.on('announceRoundEnd', (lobbyName) => {
+    socket.on('announceRoundEnd', async (lobbyName) => {
         if (!lobbies[lobbyName]) return;
         lobbies[lobbyName].roundStarted = false;
         io.to(lobbyName).emit('onRoundEnd');
     });
 
-    socket.on('submitAnswer', (lobbyName, choiceIndex) => {
+    socket.on('submitAnswer', async (lobbyName, choiceIndex) => {
         if (!lobbies[lobbyName] || lobbies[lobbyName].roundStarted === false) {
             console.log(`${socket.id} submitted answer too late or lobby doesn't exist.`);
             return;
