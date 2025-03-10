@@ -148,7 +148,7 @@ io.on('connection', (socket) => {
             }
         }
 
-        lobbies[lobbyName].players.push({ id: socket.id, name: username, choice: -1 });
+        lobbies[lobbyName].players.push({ id: socket.id, username: username, choice: -1, score: 0 });
         socket.join(lobbyName);
 
         socket.emit('joinLobbyResponse', '');
@@ -192,6 +192,11 @@ io.on('connection', (socket) => {
             } 
             io.to(lobbyName).emit('onRoundStart', selectedTracks, correctIndex, data);
         });
+
+        setInterval(() => {
+            io.to(lobbyName).emit('onRoundEnd');
+            lobbies[lobbyName].roundStarted = false;
+        }, 20000);
     });
 
     socket.on('announceRoundEnd', async (lobbyName) => {
@@ -208,7 +213,12 @@ io.on('connection', (socket) => {
 
         for (const player of lobbies[lobbyName].players) {
             if (player.id === socket.id) {
-                player.choice = choiceIndex;
+                if (player.choice == choiceIndex) {
+                    player.score += 100;
+                } else {
+                    player.score -= 50;
+                }
+                io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players);
                 break;
             }
         }
