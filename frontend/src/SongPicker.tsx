@@ -24,7 +24,7 @@ function SongPicker({ songs, onSongSelect }: Props) {
 
     return (
         <div className="song-picker">
-            <h1>Choose a song</h1>
+            <h2>Choose a song</h2>
             <div className="song-picker-songs">
                 {songs.map((song, index) => (
                     <div key={index} id={index.toString()} className="song-picker-song" onClick={() => { songSelected(index) }}>

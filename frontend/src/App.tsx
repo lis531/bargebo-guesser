@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import './App.css';
 import SongPicker from './SongPicker.tsx';
+import Leaderboard from './Leaderboard.tsx';
 import { io } from "socket.io-client";
 
 // const socket = io("http://130.162.248.218:2137");
@@ -148,23 +149,28 @@ function App() {
     }
 
 	return (
-		<div className="start-screen">
-			<h1>BARGEBO GUESSER</h1>
+		<div className="main">
+			<Leaderboard players={lobbyPlayers}/>
 			<div>
-				<div className='start-screen-inputs'>
-					<input placeholder="username" name="usernameInput" value={username} onChange={(e) => setUsername(e.target.value)} type="text" />
-					<input placeholder="lobby name" name="lobbyInput" value={lobbyName} onChange={(e) => setLobbyName(e.target.value)} type="text" />
+				<div className="start-screen">
+					<h1>BARGEBO GUESSER</h1>
+					<div>
+						<div className='start-screen-inputs'>
+							<input placeholder="username" name="usernameInput" value={username} onChange={(e) => setUsername(e.target.value)} type="text" />
+							<input placeholder="lobby name" name="lobbyInput" value={lobbyName} onChange={(e) => setLobbyName(e.target.value)} type="text" />
+						</div>
+						<div className='start-screen-buttons'>
+							<button type="submit" onClick={() => joinLobby()}>Join Lobby</button>
+							<button type="submit" onClick={() => createLobby()}>Create Lobby</button>
+							<button type="submit" onClick={() => startRound()}>Start Round</button>
+							<button type="submit" onClick={() => endRound()}>End Round</button>
+						</div>
+						<label htmlFor="volume">Volume</label>
+						<input id="volume" type='range' min={0} max={100} step={1} onChange={(e) => changeVolume(parseInt(e.target.value))}/>
+					</div>
+					<SongPicker songs={songs} onSongSelect={onSongSelection}/>
 				</div>
-				<div className='start-screen-buttons'>
-					<button type="submit" onClick={() => joinLobby()}>Join Lobby</button>
-					<button type="submit" onClick={() => createLobby()}>Create Lobby</button>
-					<button type="submit" onClick={() => startRound()}>Start Round</button>
-					<button type="submit" onClick={() => endRound()}>End Round</button>
-				</div>
-				<label htmlFor="volume">Volume</label>
-				<input id="volume" type='range' min={0} max={100} step={1} onChange={(e) => changeVolume(parseInt(e.target.value))}/>
 			</div>
-			<SongPicker songs={songs} onSongSelect={onSongSelection}/>
 		</div>
 	);
 }

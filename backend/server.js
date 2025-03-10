@@ -157,7 +157,7 @@ io.on('connection', (socket) => {
         }
 
         lobbies[lobbyName] = {
-            players: [{ id: socket.id, name: username, choice: -1 }],
+            players: [{ id: socket.id, username: username, choice: -1, score: 0 }],
             roundStarted: false
         };
         socket.join(lobbyName);
