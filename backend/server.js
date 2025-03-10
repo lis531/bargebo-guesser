@@ -46,15 +46,23 @@ async function fetchTracks() {
     return songs;
 }
 
-async function downloadSong(videoUrl, lobbyName) {    
+async function downloadSong(videoUrl) {   
+    const videoID = videoUrl.split('watch?v=')[1];
+    
+    if (fs.existsSync('audio/' + videoID + '.mp3')) {
+        return new Promise((resolve, reject) => {
+            resolve(`${videoID}.mp3`);
+        });
+    }
+    
     return new Promise((resolve, reject) => {
-        exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:10" --force-overwrites --audio-format mp3 -o "${lobbyName}.%(ext)s" ${videoUrl}`, (error, stdout, stderr) => {
+        exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:10" --force-overwrites --audio-format mp3 -o "audio/${videoID}.%(ext)s" ${videoUrl}`, (error, stdout, stderr) => {
             if (error) {
                 console.error(`Error downloading track: ${error.message}`);
                 reject(error);
             } else {
                 console.log(`Track downloaded: ${stdout}`);
-                resolve(`${lobbyName}.mp3`);
+                resolve(`${videoID}.mp3`);
             }
         });
     });
@@ -94,6 +102,30 @@ async function updateSongDB() {
     });
 }
 
+async function downloadSongsDB(songsDB) {
+    const BLOCK_SIZE = 4;
+    for (let blockID = 0; blockID < Math.ceil(songsDB.length / BLOCK_SIZE); blockID++) {
+        try {
+            console.log("Starting block " + blockID + " at i=" + (blockID * BLOCK_SIZE));
+
+            const promises = [];
+            for (let i = blockID * BLOCK_SIZE, j = 0; i < songsDB.length, j < BLOCK_SIZE; i++, j++) {
+                promises.push(downloadSong(songsDB[i].url));
+            }
+    
+            for (let i = blockID * BLOCK_SIZE, j = 0; i < songsDB.length, j < BLOCK_SIZE; i++, j++) {
+                await promises[j];
+    
+                if((i+1) % 10 === 0) {
+                    console.log("Downloaded " + (i + 1) + " out of " + songsDB.length + " songs.")
+                }
+            }
+        } catch {
+            blockID -= 1;
+        }
+    }
+}
+
 //await updateSongDB();
 
 const lobbies = {};
@@ -104,6 +136,8 @@ for (let i = 0; i < allSongs.length; i++) {
     allSongs[i].url = `https://www.youtube.com/watch?v=${allSongs[i].id}`;
     delete allSongs[i].id;
 }
+
+//await downloadSongsDB(allSongs);
 
 console.log("Loaded the songs DB of " + allSongs.length + " songs.");
 
@@ -189,11 +223,12 @@ io.on('connection', (socket) => {
         
         console.log("Starting download...");
 
-        await downloadSong(correctVideoUrl, lobbyName);
+        const videoID = correctVideoUrl.split('watch?v=')[1];
+        await downloadSong(correctVideoUrl);
 
         console.log("Starting round...");
 
-        fs.readFile(`./${lobbyName}.mp3`, (err, data) => {
+        fs.readFile(`audio/${videoID}.mp3`, (err, data) => {
             if (err !== null) {
                 console.log(err);
                 return;
