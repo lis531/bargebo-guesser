@@ -14,7 +14,7 @@ function App() {
 	const [lobbyNames, setLobbyNames] = useState([]);
 	const [currentLobby, setCurrentLobby] = useState("");
 	const [selectedSong, setSelectedSong] = useState<number>();
-	const [songs, setSongs] = useState<{ title: string; artist: string; cover: string; }[]>([]);
+	const [songs, setSongs] = useState<{ title: string; artist: string; cover: string; url: string; }[]>([]);
 	const [correctSongIndex, setCorrectSongIndex] = useState<number>();
 	const audioContextRef = useRef<AudioContext | null>(null);
 	const gainNodeRef = useRef<GainNode | null>(null);	

@@ -20,53 +20,7 @@ const io = new Server(server, {
     }
 });
 
-async function getAccessToken() {
-    const clientId = 'b8156c11c6ca4c32b541d3392225aed3';
-    const clientSecret = '24d6189fba74450fb8a7917fa150fcea';
-
-    const response = await fetch('https://accounts.spotify.com/api/token', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            Authorization: `Basic ${Buffer.from(clientId + ':' + clientSecret).toString('base64')}`,
-        },
-        body: 'grant_type=client_credentials',
-    });
-
-    const data = await response.json();
-    return data.access_token;
-}
-
-async function fetchSpotifyAPI(endpoint, method, body) {
-    const token = await getAccessToken();
-    const res = await fetch(`https://api.spotify.com/${endpoint}`, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        method,
-        body: body ? JSON.stringify(body) : undefined,
-    });
-    return await res.json();
-}
-
-async function getSpotifyCover(title, artist) {
-    try {
-        const query = `track:${title} artist:${artist}`;
-        const response = await fetchSpotifyAPI(`v1/search?q=${encodeURIComponent(query)}&type=track&market=US&limit=1`, 'GET');
-        if (response.tracks && response.tracks.items && response.tracks.items.length > 0) {
-            return response.tracks.items[0].album.images[0]?.url || '';
-        }
-    } catch (err) {
-        console.error("Error getting Spotify cover:", err);
-    }
-    return '';
-}
-
-const lobbies = {};
-
 async function fetchTracks() {
-    const totalSongs = 1000;
     const limit = 50;
     const totalPages = 20;
     let allTracks = [];
@@ -75,6 +29,7 @@ async function fetchTracks() {
         const url = `http://ws.audioscrobbler.com/2.0/?method=chart.gettoptracks&api_key=${LAST_FM_API_KEY}&format=json&limit=${limit}&page=${page}`;
         const response = await fetch(url);
         const data = await response.json();
+
         if (data.tracks && data.tracks.track) {
             allTracks.push(...data.tracks.track);
         }
@@ -86,7 +41,7 @@ async function fetchTracks() {
         title: track.name,
         artist: track.artist.name,
         cover: '',
-        url: track.url,
+        url: ''
     }));
 
     return songs;
@@ -99,58 +54,44 @@ async function selectTracks(allTracks) {
         selectedTracks.push(allTracks[randomIndex]);
     }
 
-    for (let track of selectedTracks) {
-        track.cover = await getSpotifyCover(track.title, track.artist);
+    for (let i = 0; i < NUM_SONGS_TO_GUESS; i++) {
+        const query = selectedTracks[i].title + " " + selectedTracks[i].artist;
+        const searchResult = await ytSearch(query);
+        const videoURL = searchResult.videos[0].url;
+
+        const videoID = videoURL.split('watch?v=')[1]
+        
+        selectedTracks[i].url = videoURL;
+        selectedTracks[i].cover = `https://img.youtube.com/vi/${videoID}/0.jpg`;
     }
-  
+
     return selectedTracks;
 }
 
-async function downloadSong(videoUrl) {
-    fs.unlink('downloadedSong.mp3', (err) => {
-        if (err && err.code !== 'ENOENT') {
-            console.error(`Error removing file: ${err.message}`);
-        } else {
-            console.log('File removed');
-        }
-    });
-    
+async function downloadSong(videoUrl, lobbyName) {    
     return new Promise((resolve, reject) => {
-        exec(`yt-dlp -x --download-sections "*0:40-0:50" --audio-format mp3 --audio-quality 4 -o "downloadedSong.%(ext)s" ${videoUrl}`, (error, stdout, stderr) => {
+        exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:10" --force-overwrites --audio-format mp3 -o "${lobbyName}.%(ext)s" ${videoUrl}`, (error, stdout, stderr) => {
             if (error) {
                 console.error(`Error downloading track: ${error.message}`);
                 reject(error);
             } else {
                 console.log(`Track downloaded: ${stdout}`);
-                resolve('downloadedSong.mp3');
+                resolve(`${lobbyName}.mp3`);
             }
         });
     });
 }
 
-async function trimSong() {
-    return new Promise((resolve, reject) => {
-        exec('ffmpeg -i downloadedSong.mp3 -y -ss 40 -to 60 -c copy final.mp3', (error, stdout, stderr) => {
-            if (error) {
-                console.error(`Error converting track: ${error.message}`);
-                reject(error);
-            } else {
-                console.log(`Track converted: ${stdout}`);
-                resolve('final.mp3');
-            }
-        });
-    });
-}
+const lobbies = {};
+
+let allSongs = await fetchTracks();
 
 io.on('connection', (socket) => {
     console.log(`Client connected: ${socket.id}`);
-    let allSongs = [];
 
     socket.emit('onLobbyListChanged', Object.keys(lobbies));
 
     socket.on('createLobby', async (lobbyName, username) => {
-        allSongs = await fetchTracks();
-
         if (lobbies[lobbyName]) {
             socket.emit('createLobbyResponse', lobbyName, 'Lobby already exists!');
             return;
@@ -205,18 +146,20 @@ io.on('connection', (socket) => {
         lobbies[lobbyName].roundStarted = true;
 
         const selectedTracks = await selectTracks(allSongs);
+        console.log(selectedTracks);
         const correctIndex = Math.floor(Math.random() * selectedTracks.length);
 
         const query = selectedTracks[correctIndex].title + " " + selectedTracks[correctIndex].artist;
-        const searchResults = await ytSearch(query);
-        const videoUrl = searchResults.videos[0].url;
+        const searchResult = await ytSearch(query);
+        const correctVideoUrl = searchResult.videos[0].url;
         
-        await downloadSong(videoUrl);
-        //await trimSong();
+        console.log("Starting download...");
+        
+        await downloadSong(correctVideoUrl, lobbyName);
 
-        fs.readFile('./downloadedSong.mp3', (err, data) => {
+        fs.readFile(`./${lobbyName}.mp3`, (err, data) => {
             if (err !== null) {
-                console.log();
+                console.log(err);
                 return;
             } 
             io.to(lobbyName).emit('onRoundStart', selectedTracks, correctIndex, data);
