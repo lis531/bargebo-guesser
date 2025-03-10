@@ -160,6 +160,13 @@ io.on('connection', (socket) => {
     socket.on('announceRoundStart', async (lobbyName) => {
         if (!lobbies[lobbyName]) return;
 
+        if (lobbies[lobbyName].roundStarted) {
+            clearInterval(lobbies[lobbyName].timeInterval);
+            clearTimeout(lobbies[lobbyName].timeOut);
+            lobbies[lobbyName].roundStarted = false;
+            io.to(lobbyName).emit('onRoundEnd');
+        }
+
         for (const player of lobbies[lobbyName].players) {
             player.choice = -1;
         }
@@ -178,6 +185,7 @@ io.on('connection', (socket) => {
 
         const correctIndex = Math.floor(Math.random() * selectedTracks.length);
         const correctVideoUrl = selectedTracks[correctIndex].url;
+        lobbies[lobbyName].correctIndex = correctIndex;
         
         console.log("Starting download...");
 
@@ -193,14 +201,24 @@ io.on('connection', (socket) => {
             io.to(lobbyName).emit('onRoundStart', selectedTracks, correctIndex, data);
         });
 
-        setInterval(() => {
+        let timePassed = 0;
+        const timerInterval = setInterval(() => {
+            timePassed += 1;
+            io.to(lobbyName).emit('timerChange', timePassed);
+        }, 1000);
+
+        const roundTimeOut = setTimeout(() => {
+            clearInterval(timeInterval);
             io.to(lobbyName).emit('onRoundEnd');
-            lobbies[lobbyName].roundStarted = false;
         }, 20000);
+
+        lobbies[lobbyName].timeInterval = timerInterval;
+        lobbies[lobbyName].timeOut = roundTimeOut;
     });
 
     socket.on('announceRoundEnd', async (lobbyName) => {
         if (!lobbies[lobbyName]) return;
+        clearInterval(lobbies[lobbyName].timeInterval);
         lobbies[lobbyName].roundStarted = false;
         io.to(lobbyName).emit('onRoundEnd');
     });
@@ -213,7 +231,7 @@ io.on('connection', (socket) => {
 
         for (const player of lobbies[lobbyName].players) {
             if (player.id === socket.id) {
-                if (player.choice == choiceIndex) {
+                if (choiceIndex == lobbies[lobbyName].correctIndex) {
                     player.score += 100;
                 } else {
                     player.score -= 50;

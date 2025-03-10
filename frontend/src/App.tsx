@@ -78,18 +78,6 @@ function App() {
 			}, (err) => {
 				console.log("Playback error: " + err);
 			});
-
-			const timer = document.querySelector('.timer') as HTMLElement;
-			timer.classList.remove('hidden');
-			let timerValue = 0;
-			const timeInterval = setInterval(() => {
-				timerValue++;
-				timer.innerText = "Timer: " + (timerValue).toString();
-			}, 1000);
-
-			setTimeout(() => {
-				clearInterval(timeInterval);
-			}, 20000);
 		});
 		
 		socket.on('onRoundEnd', () => {
@@ -99,6 +87,12 @@ function App() {
 			}
 
 			console.log("Ending round.");
+		});
+
+		socket.on('timerChange', (timePassed) => {
+			const timer = document.querySelector('.timer') as HTMLElement;
+			timer.classList.remove('hidden');
+			timer.innerText = "Timer: " + (timePassed).toString();
 		});
 	}, [])
 
@@ -123,7 +117,7 @@ function App() {
 	}
 
 	const submitAnswer = (choiceIndex: number) => {
-		socket.emit('submitAnswer', lobbyName, username, choiceIndex);
+		socket.emit('submitAnswer', lobbyName, choiceIndex);
 	}
 
 	const resetSongSelection = () => {
