@@ -23,7 +23,7 @@ function SongPicker({ songs, onSongSelect }: Props) {
     }
 
     return (
-        <div className="song-picker">
+        <div className="song-picker hidden">
             <h2>Choose a song</h2>
             <div className="song-picker-songs">
                 {songs.map((song, index) => (

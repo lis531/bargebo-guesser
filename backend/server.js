@@ -46,15 +46,15 @@ async function fetchTracks() {
     return songs;
 }
 
-async function downloadSong(videoUrl) {   
+async function downloadSong(videoUrl) {
     const videoID = videoUrl.split('watch?v=')[1];
-    
+
     if (fs.existsSync('audio/' + videoID + '.mp3')) {
         return new Promise((resolve, reject) => {
             resolve(`${videoID}.mp3`);
         });
     }
-    
+
     return new Promise((resolve, reject) => {
         exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:10" --force-overwrites --audio-format mp3 -o "audio/${videoID}.%(ext)s" ${videoUrl}`, (error, stdout, stderr) => {
             if (error) {
@@ -86,8 +86,8 @@ async function updateSongDB() {
             const videoURL = result.videos[0].url;
             const videoID = videoURL.split('watch?v=')[1];
             allSongs[i].id = videoID;
-    
-            if((i+1) % 10 === 0) {
+
+            if ((i + 1) % 10 === 0) {
                 console.log("Processed " + (i + 1) + " out of " + allSongs.length + " songs.")
             }
         }
@@ -112,11 +112,11 @@ async function downloadSongsDB(songsDB) {
             for (let i = blockID * BLOCK_SIZE, j = 0; i < songsDB.length, j < BLOCK_SIZE; i++, j++) {
                 promises.push(downloadSong(songsDB[i].url));
             }
-    
+
             for (let i = blockID * BLOCK_SIZE, j = 0; i < songsDB.length, j < BLOCK_SIZE; i++, j++) {
                 await promises[j];
-    
-                if((i+1) % 10 === 0) {
+
+                if ((i + 1) % 10 === 0) {
                     console.log("Downloaded " + (i + 1) + " out of " + songsDB.length + " songs.")
                 }
             }
@@ -196,22 +196,19 @@ io.on('connection', (socket) => {
 
         if (lobbies[lobbyName].roundStarted) {
             clearInterval(lobbies[lobbyName].timeInterval);
-            clearTimeout(lobbies[lobbyName].timeOut);
             lobbies[lobbyName].roundStarted = false;
             io.to(lobbyName).emit('onRoundEnd');
         }
 
-        for (const player of lobbies[lobbyName].players) {
-            player.choice = -1;
-        }
-
+        lobbies[lobbyName].players.forEach(player => player.choice = -1);
         lobbies[lobbyName].roundStarted = true;
+        lobbies[lobbyName].firstPlayerId = '';
 
         console.log("Selecting tracks...");
         const selectedTracks = [];
         for (let i = 0; i < NUM_SONGS_TO_GUESS; i++) {
             const randomIndex = Math.floor(Math.random() * allSongs.length);
-            
+
             selectedTracks.push(allSongs[randomIndex]);
         }
 
@@ -220,7 +217,7 @@ io.on('connection', (socket) => {
         const correctIndex = Math.floor(Math.random() * selectedTracks.length);
         const correctVideoUrl = selectedTracks[correctIndex].url;
         lobbies[lobbyName].correctIndex = correctIndex;
-        
+
         console.log("Starting download...");
 
         const videoID = correctVideoUrl.split('watch?v=')[1];
@@ -232,23 +229,27 @@ io.on('connection', (socket) => {
             if (err !== null) {
                 console.log(err);
                 return;
-            } 
+            }
             io.to(lobbyName).emit('onRoundStart', selectedTracks, correctIndex, data);
         });
 
-        let timePassed = 0;
+        lobbies[lobbyName].timePassed = 0;
+        console.log(lobbies[lobbyName].timePassed);
         const timerInterval = setInterval(() => {
-            timePassed += 1;
-            io.to(lobbyName).emit('timerChange', timePassed);
-        }, 1000);
-
-        const roundTimeOut = setTimeout(() => {
-            clearInterval(timeInterval);
-            io.to(lobbyName).emit('onRoundEnd');
-        }, 20000);
+            if (!lobbies[lobbyName]) {
+                clearInterval(timerInterval);
+                return;
+            }
+            lobbies[lobbyName].timePassed += 0.01;
+            io.to(lobbyName).emit('timerChange', lobbies[lobbyName].timePassed.toFixed(2));
+            if (lobbies[lobbyName].timePassed >= 20) {
+                clearInterval(timerInterval);
+                io.to(lobbyName).emit('onRoundEnd');
+                console.log(lobbies[lobbyName].timePassed);
+            }
+        }, 10);
 
         lobbies[lobbyName].timeInterval = timerInterval;
-        lobbies[lobbyName].timeOut = roundTimeOut;
     });
 
     socket.on('announceRoundEnd', async (lobbyName) => {
@@ -266,15 +267,29 @@ io.on('connection', (socket) => {
 
         for (const player of lobbies[lobbyName].players) {
             if (player.id === socket.id) {
+                player.choice = choiceIndex;
                 if (choiceIndex == lobbies[lobbyName].correctIndex) {
-                    player.score += 100;
-                } else {
-                    player.score -= 50;
+                    if (lobbies[lobbyName].firstPlayerId === '') {
+                        lobbies[lobbyName].firstPlayerId = socket.id;
+                        player.score += 100;
+                    }
+                    const baseScore = 500;
+                    const timeFactor = 1 - Number(lobbies[lobbyName].timePassed) / 20;
+                    player.score += Math.round(baseScore * timeFactor * 100) / 100;
                 }
                 io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players);
                 break;
             }
         }
+
+        for (const player of lobbies[lobbyName].players) {
+            if (player.choice === -1) {
+                console.log("Not all players submitted their answers.");
+                return;
+            }
+        }
+
+        console.log("All players submitted their answers.");
     });
 
     socket.on('disconnect', () => {

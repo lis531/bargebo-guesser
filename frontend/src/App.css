@@ -17,26 +17,44 @@
 	}
 }
 
-.start-screen {
+.main-screen {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
+	justify-content: space-around;
 	height: 100vh;
 	color: white;
 
 	& > h1 {
 		font-family: 'Syne';
 		font-size: 5em;
+		min-height: 20vh;
 	}
 
-	& > div {
-		height: 70%;
+	.start-screen-content {
 		display: flex;
 		flex-direction: column;
 		justify-content: center;
-		align-items: center;
 		gap: 1em;
 		justify-self: center;
+		min-height: 30vh;
+	}
+
+	& > footer {
+		min-height: 30vh;
+		display: flex;
+		flex-direction: column;
+		justify-content: end;
+	}
+
+	.game-screen-content {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		gap: 1em;
+		justify-self: center;
+		width: 300px;
+		min-height: 30vh;
 	}
 
 	.start-screen-inputs {
@@ -56,5 +74,27 @@
 		display: flex;
 		color: black;
 		gap: 1em;
+	}
+
+	.timer {
+		display: flex;
+		margin: 0 0 0.5em 0;
+		gap: 0.2em;
+		& > p {
+			margin: 0;
+		}
+	}
+
+	.volume {
+		display: flex;
+		flex-direction: column;
+		& > label {
+			text-indent: 0.3em;
+			margin-bottom: 0.1em;
+			font-size: large;
+		}
+		& > input {
+			margin-bottom: 1em;
+		}
 	}
 }

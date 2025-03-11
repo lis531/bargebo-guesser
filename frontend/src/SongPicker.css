@@ -1,14 +1,15 @@
 .song-picker {
     display: flex;
-    justify-content: center;
     align-items: center;
     flex-direction: column;
+    margin: 2em;
+    min-height: 30vh;
 }
 
 .song-picker-songs {
     display: flex;
     flex-wrap: wrap;
-    gap: 1em;
+    gap: 2em;
 }
 
 .song-picker-song {
