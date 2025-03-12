@@ -23,3 +23,4 @@ dist-ssr
 *.sln
 *.sw?
 *.mp3
+secrets.*

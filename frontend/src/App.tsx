@@ -4,8 +4,8 @@ import SongPicker from './SongPicker.tsx';
 import Leaderboard from './Leaderboard.tsx';
 import { io } from "socket.io-client";
 
-// const socket = io("http://130.162.248.218:2137");
-const socket = io("http://localhost:2137");
+const socket = io("http://130.162.248.218:2137");
+//const socket = io("http://localhost:2137");
 
 function App() {
 	const [lobbyName, setLobbyName] = useState<string>("");

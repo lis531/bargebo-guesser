@@ -5,9 +5,9 @@ import cors from 'cors';
 import ytSearch from 'yt-search';
 import { exec } from 'child_process';
 import fs from 'fs';
+import LAST_FM_API_KEY from './secrets.js';
 
 const NUM_SONGS_TO_GUESS = 4;
-const LAST_FM_API_KEY = 'a9a79c6c24df636090cfa7ee4fa2c040';
 
 const app = express();
 app.use(cors());
