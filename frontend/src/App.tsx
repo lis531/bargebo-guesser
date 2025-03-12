@@ -5,18 +5,18 @@ import Leaderboard from './Leaderboard.tsx';
 import { io } from "socket.io-client";
 
 const socket = io("http://130.162.248.218:2137");
-//const socket = io("https://localhost:2137");
+// const socket = io("http://localhost:2137");
 
 function App() {
 	const [lobbyName, setLobbyName] = useState<string>("");
 	const [username, setUsername] = useState<string>("");
 	const [lobbyPlayers, setLobbyPlayers] = useState([]);
-	//const [lobbyNames, setLobbyNames] = useState([]);
-	//const [currentLobby, setCurrentLobby] = useState("");
-	//const [selectedSong, setSelectedSong] = useState<number>();
+	// const [lobbyNames, setLobbyNames] = useState([]);
+	// const [currentLobby, setCurrentLobby] = useState("");
+	// const [selectedSong, setSelectedSong] = useState<number>();
 	const [songs, setSongs] = useState<{ title: string; artist: string; cover: string; url: string; }[]>([]);
 	const [correctSongIndex, setCorrectSongIndex] = useState<number>();
-	const [initialVolume] = useState<number>(Number(localStorage.getItem('volume')) || 50);
+	const initialVolume = Number(localStorage.getItem('volume')) || 50;
 	const audioContextRef = useRef<AudioContext | null>(null);
 	const gainNodeRef = useRef<GainNode | null>(null);
 	const sourceAudioBufferRef = useRef<AudioBufferSourceNode | null>(null);
@@ -31,7 +31,7 @@ function App() {
 		changeVolume(initialVolume);
 
 		socket.on('onLobbyListChanged', (lobbyNames) => {
-			//setLobbyNames(lobbyNames);
+			// setLobbyNames(lobbyNames);
 			console.log("Lobby names changed: ", lobbyNames);
 		});
 
@@ -72,7 +72,7 @@ function App() {
 			}
 
 			resetSongSelection();
-			//setSelectedSong(-1);
+			// setSelectedSong(-1);
 			setCorrectSongIndex(correctIndex);
 			setSongs(allSongs);
 
@@ -146,7 +146,7 @@ function App() {
 	};
 
 	const onSongSelection = (index: number) => {
-		//setSelectedSong(index);
+		// setSelectedSong(index);
 
 		submitAnswer(index);
 
