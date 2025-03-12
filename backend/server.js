@@ -1,5 +1,6 @@
 import express from 'express';
 import http from 'http';
+import https from 'https';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import ytSearch from 'yt-search';
@@ -195,6 +196,10 @@ async function announceRoundStart(lobbyName) {
 }
 
 async function announceRoundEnd(lobbyName) {
+    if (!lobbies[lobbyName]) {
+        return;
+    }
+
     clearInterval(lobbies[lobbyName].timeInterval);
 
     lobbies[lobbyName].roundStarted = false;
