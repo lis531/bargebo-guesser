@@ -31,6 +31,12 @@
 		min-height: 20vh;
 	}
 
+	label {
+		text-indent: 0.3em;
+		margin-bottom: 0.1em;
+		font-size: large;
+	}
+
 	.start-screen-content {
 		display: flex;
 		flex-direction: column;
@@ -55,16 +61,16 @@
 		justify-self: center;
 		width: 300px;
 		min-height: 30vh;
+		.host-controls > div {
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+		}
 	}
 
 	.start-screen-inputs {
 		display: flex;
 		flex-direction: column;
-		& > label {
-			text-indent: 0.3em;
-			margin-bottom: 0.1em;
-			font-size: large;
-		}
 		& > input {
 			margin-bottom: 1em;
 		}

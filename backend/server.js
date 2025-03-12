@@ -152,15 +152,16 @@ io.on('connection', (socket) => {
             return;
         }
 
+        
         lobbies[lobbyName] = {
             players: [{ id: socket.id, username: username, choice: -1, score: 0 }],
             roundStarted: false
         };
         socket.join(lobbyName);
-
+        
         socket.emit('createLobbyResponse', lobbyName, '');
         io.emit('onLobbyListChanged', Object.keys(lobbies));
-        io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players);
+        io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
 
         console.log(`Lobby created: ${lobbyName}, by: ${username}`);
     });
@@ -186,9 +187,17 @@ io.on('connection', (socket) => {
         socket.join(lobbyName);
 
         socket.emit('joinLobbyResponse', '');
-        io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players);
+        io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
 
         console.log(`User ${username} joined lobby: ${lobbyName}`);
+    });
+
+    socket.on('announceGameStart', async (lobbyName, rounds) => {
+        if (!lobbies[lobbyName]) return;
+
+        lobbies[lobbyName].rounds = rounds;
+        io.to(lobbyName).emit('onGameStart');
+        // rozpocznij grę tyle razy ile jest rund
     });
 
     socket.on('announceRoundStart', async (lobbyName) => {
@@ -202,7 +211,7 @@ io.on('connection', (socket) => {
 
         lobbies[lobbyName].players.forEach(player => player.choice = -1);
         lobbies[lobbyName].roundStarted = true;
-        lobbies[lobbyName].firstPlayerId = '';
+        lobbies[lobbyName].firstAnswserPlayerId = '';
 
         console.log("Selecting tracks...");
         const selectedTracks = [];
@@ -252,13 +261,6 @@ io.on('connection', (socket) => {
         lobbies[lobbyName].timeInterval = timerInterval;
     });
 
-    socket.on('announceRoundEnd', async (lobbyName) => {
-        if (!lobbies[lobbyName]) return;
-        clearInterval(lobbies[lobbyName].timeInterval);
-        lobbies[lobbyName].roundStarted = false;
-        io.to(lobbyName).emit('onRoundEnd');
-    });
-
     socket.on('submitAnswer', async (lobbyName, choiceIndex) => {
         if (!lobbies[lobbyName] || lobbies[lobbyName].roundStarted === false) {
             console.log(`${socket.id} submitted answer too late or lobby doesn't exist.`);
@@ -269,15 +271,15 @@ io.on('connection', (socket) => {
             if (player.id === socket.id) {
                 player.choice = choiceIndex;
                 if (choiceIndex == lobbies[lobbyName].correctIndex) {
-                    if (lobbies[lobbyName].firstPlayerId === '') {
-                        lobbies[lobbyName].firstPlayerId = socket.id;
+                    if (lobbies[lobbyName].firstAnswserPlayerId === '') {
+                        lobbies[lobbyName].firstAnswserPlayerId = socket.id;
                         player.score += 100;
                     }
                     const baseScore = 500;
                     const timeFactor = 1 - Number(lobbies[lobbyName].timePassed) / 20;
                     player.score += Math.round(baseScore * timeFactor * 100) / 100;
                 }
-                io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players);
+                io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
                 break;
             }
         }
@@ -290,12 +292,18 @@ io.on('connection', (socket) => {
         }
 
         console.log("All players submitted their answers.");
+        setTimeout(() => {
+            clearInterval(lobbies[lobbyName].timeInterval);
+            lobbies[lobbyName].roundStarted = false;
+            io.to(lobbyName).emit('onRoundEnd');
+            // start next round
+        }, 5000);
     });
 
     socket.on('disconnect', () => {
         for (const lobby in lobbies) {
             lobbies[lobby].players = lobbies[lobby].players.filter(p => p.id !== socket.id);
-            io.to(lobby).emit('onPlayersChanged', lobbies[lobby].players);
+            io.to(lobby).emit('onPlayersChanged', lobbies[lobby].players.sort((a, b) => b.score - a.score));
             if (lobbies[lobby].players.length === 0) {
                 delete lobbies[lobby];
                 io.emit('onLobbyListChanged', Object.keys(lobbies));

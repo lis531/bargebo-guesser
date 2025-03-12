@@ -8,6 +8,7 @@ interface Player {
 
 function Leaderboard(props: { players: Player[] }) {
     const { players } = props;
+    console.log(players);
     if (players.length === 0) {
         return <div></div>;
     }
@@ -15,7 +16,7 @@ function Leaderboard(props: { players: Player[] }) {
         <div className="leaderboard">
             <h2>Leaderboard</h2>
             <div className="leaderboard-players">
-                {players.sort((a, b) => b.score - a.score).map((player, index) => {
+                {players.map((player, index) => {
                     return (
                         <div key={index} className="leaderboard-player">
                             <span>

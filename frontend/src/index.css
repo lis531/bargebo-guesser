@@ -71,7 +71,7 @@ button:focus-visible {
     outline: 4px auto -webkit-focus-ring-color;
 }
 
-input[type='text'] {
+input[type='text'], input[type='number'] {
     padding: 0.5em;
     border-radius: 8px;
     border: 2px solid transparent;
@@ -94,6 +94,10 @@ input[type='range'] {
 
 .hidden {
     display: none !important;
+}
+
+.invisible {
+    visibility: hidden;
 }
 
 @media (prefers-color-scheme: light) {

@@ -46,6 +46,7 @@ function App() {
 				return;
 			}
 			switchUI();
+			document.querySelector(".host-controls")!.classList.remove("hidden");
 			console.log("Successfully created a lobby called: ", lobbyName);
 		});
 
@@ -56,6 +57,12 @@ function App() {
 			}
 			switchUI();
 			console.log("Successfully joined a lobby called: ", lobbyName);
+		});
+
+		socket.on('onGameStart', () => {
+			document.querySelector('.host-controls')!.classList.add('hidden');
+			document.querySelector('.timer')!.classList.remove('hidden');
+			document.querySelector('.song-picker')!.classList.remove('invisible');
 		});
 
 		socket.on('onRoundStart', (allSongs, correctIndex, correctSongData) => {
@@ -84,7 +91,8 @@ function App() {
 				sourceAudioBufferRef.current.stop();
 				sourceAudioBufferRef.current = null;
 			}
-
+			
+			socket.emit('announceRoundStart', lobbyName);
 			console.log("Ending round.");
 		});
 
@@ -105,7 +113,8 @@ function App() {
 		}
 	};
 
-	const startRound = () => {
+	const startGame = () => {
+		socket.emit('announceGameStart', lobbyName, parseInt((document.getElementById('rounds') as HTMLInputElement).value));
 		socket.emit('announceRoundStart', lobbyName);
 	}
 
@@ -128,13 +137,13 @@ function App() {
 	const switchUI = () => {
 		if (hasSwitched) return;
 		hasSwitched = true;
-	
+
 		console.log("Switching UI");
 		document.querySelector(".start-screen-content")!.classList.toggle("hidden");
 		document.querySelector("footer")!.classList.toggle("hidden");
 		document.querySelector(".game-screen-content")!.classList.toggle("hidden");
 		document.querySelector(".song-picker")!.classList.toggle("hidden");
-	};	
+	};
 
 	const onSongSelection = (index: number) => {
 		setSelectedSong(index);
@@ -184,12 +193,18 @@ function App() {
 						</div>
 					</div>
 					<div className='game-screen-content hidden'>
-						<h1 className='timer'><p>Timer:</p><p>0</p></h1>
+						<h1 className='timer hidden'><p>Timer:</p><p>0</p></h1>
 						<div className='volume'>
 							<label htmlFor="volume">Volume</label>
 							<input id="volume" type='range' defaultValue={initialVolume} min={0} max={100} step={1} onChange={(e) => changeVolume(parseInt(e.target.value))} />
 						</div>
-						<button className='submitButton' type="submit" onClick={() => startRound()}>Start Round</button>
+						<div className='host-controls hidden'>
+							<button className='submitButton' type="submit" onClick={() => startGame()}>Start</button>
+							<div>
+								<label>Number of rounds:</label>
+								<input id='rounds' type="number" min={1} max={30} placeholder="Number of rounds" />
+							</div>
+						</div>
 					</div>
 					<SongPicker songs={songs} onSongSelect={onSongSelection} />
 					<footer>Borys Gajewki & Mateusz Antkiewicz @ 2025</footer>
