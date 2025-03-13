@@ -8,13 +8,10 @@ interface Player {
 
 function Leaderboard(props: { players: Player[] }) {
     const { players } = props;
-    console.log(players);
-    if (players.length === 0) {
-        return <div></div>;
-    }
     return (
         <div className="leaderboard">
             <h2>Leaderboard</h2>
+            <h3 id='roundNumber'>Round: </h3>
             <div className="leaderboard-players">
                 {players.map((player, index) => {
                     return (

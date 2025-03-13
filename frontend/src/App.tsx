@@ -4,8 +4,8 @@ import SongPicker from './SongPicker.tsx';
 import Leaderboard from './Leaderboard.tsx';
 import { io } from "socket.io-client";
 
-const socket = io("http://130.162.248.218:2137");
-// const socket = io("http://localhost:2137");
+// const socket = io("https://130.162.248.218:2137");
+const socket = io("http://localhost:2137");
 
 function App() {
 	const [lobbyName, setLobbyName] = useState<string>("");
@@ -13,9 +13,9 @@ function App() {
 	const [lobbyPlayers, setLobbyPlayers] = useState([]);
 	// const [lobbyNames, setLobbyNames] = useState([]);
 	// const [currentLobby, setCurrentLobby] = useState("");
-	// const [selectedSong, setSelectedSong] = useState<number>();
 	const [songs, setSongs] = useState<{ title: string; artist: string; cover: string; url: string; }[]>([]);
 	const [correctSongIndex, setCorrectSongIndex] = useState<number>();
+	const [isGameUIOn, switchGameUI] = useState(false);
 	const initialVolume = Number(localStorage.getItem('volume')) || 50;
 	const audioContextRef = useRef<AudioContext | null>(null);
 	const gainNodeRef = useRef<GainNode | null>(null);
@@ -45,7 +45,7 @@ function App() {
 				console.log("Error while creating a lobby: ", err);
 				return;
 			}
-			switchUI();
+			switchGameUI(true);
 			document.querySelector(".host-controls")!.classList.remove("hidden");
 			console.log("Successfully created a lobby called: ", lobbyName);
 		});
@@ -55,26 +55,31 @@ function App() {
 				console.log("Error while joining a lobby: ", err);
 				return;
 			}
-			switchUI();
+			switchGameUI(true);
 			console.log("Successfully joined a lobby called: ", lobbyName);
 		});
 
 		socket.on('onGameStart', () => {
 			document.querySelector('.host-controls')!.classList.add('hidden');
 			document.querySelector('.timer')!.classList.remove('hidden');
-			document.querySelector('.song-picker')!.classList.remove('invisible');
+			document.querySelector('.timer')!.classList.add('invisible');
+			document.querySelector('.song-picker')!.classList.add('invisible');
 		});
 
-		socket.on('onRoundStart', (allSongs, correctIndex, correctSongData) => {
+		socket.on('onRoundStart', (allSongs, correctIndex, correctSongData, currentRounds, rounds) => {
 			if (sourceAudioBufferRef.current !== null) {
 				sourceAudioBufferRef.current.stop();
 				sourceAudioBufferRef.current = null;
 			}
 
 			resetSongSelection();
-			// setSelectedSong(-1);
 			setCorrectSongIndex(correctIndex);
 			setSongs(allSongs);
+			const roundNumber = document.getElementById('roundNumber') as HTMLElement;
+			roundNumber.innerHTML = `Round: ${currentRounds} / ${rounds}`;
+
+			document.querySelector('.timer')!.classList.remove('invisible');
+			document.querySelector('.song-picker')!.classList.remove('invisible');
 
 			audioContextRef.current!.decodeAudioData(correctSongData, (buffer) => {
 				sourceAudioBufferRef.current = audioContextRef.current!.createBufferSource();
@@ -86,12 +91,22 @@ function App() {
 			});
 		});
 
+		socket.on('onGameEnd', () => {
+			if (sourceAudioBufferRef.current !== null) {
+				sourceAudioBufferRef.current.stop();
+				sourceAudioBufferRef.current = null;
+			}
+			console.log("Game ended.");
+
+			switchGameUI(false);
+		});
+
 		socket.on('onRoundEnd', () => {
 			if (sourceAudioBufferRef.current !== null) {
 				sourceAudioBufferRef.current.stop();
 				sourceAudioBufferRef.current = null;
 			}
-			
+
 			socket.emit('announceRoundStart', lobbyName);
 			console.log("Ending round.");
 		});
@@ -100,6 +115,15 @@ function App() {
 			document.querySelectorAll('.timer > p')[1].innerHTML = timePassed.toString();
 		});
 	}, [])
+
+	useEffect(() => {
+		console.log("Switching UI");
+		document.querySelector(".start-screen-content")!.classList.toggle("hidden");
+		document.querySelector("footer")!.classList.toggle("hidden");
+		document.querySelector(".game-screen-content")!.classList.toggle("hidden");
+		document.querySelector(".song-picker")!.classList.toggle("hidden");
+		document.querySelector(".sidebar")!.classList.toggle("hidden");
+	}, [isGameUIOn]);
 
 	const createLobby = () => {
 		if (lobbyName && username) {
@@ -114,7 +138,15 @@ function App() {
 	};
 
 	const startGame = () => {
-		socket.emit('announceGameStart', lobbyName, parseInt((document.getElementById('rounds') as HTMLInputElement).value));
+		const rounds = parseInt((document.getElementById('rounds') as HTMLInputElement).value);
+		const feedbackElement = document.getElementById('feedback') as HTMLElement;
+		if (rounds < 1 || rounds > 30 || isNaN(rounds)) {
+			feedbackElement.innerHTML = "Invalid number of rounds.";
+			return;
+		} else {
+			feedbackElement.innerHTML = "";
+		}
+		socket.emit('announceGameStart', lobbyName, rounds);
 		socket.emit('announceRoundStart', lobbyName);
 	}
 
@@ -132,22 +164,7 @@ function App() {
 		});
 	}
 
-	let hasSwitched = false;
-
-	const switchUI = () => {
-		if (hasSwitched) return;
-		hasSwitched = true;
-
-		console.log("Switching UI");
-		document.querySelector(".start-screen-content")!.classList.toggle("hidden");
-		document.querySelector("footer")!.classList.toggle("hidden");
-		document.querySelector(".game-screen-content")!.classList.toggle("hidden");
-		document.querySelector(".song-picker")!.classList.toggle("hidden");
-	};
-
 	const onSongSelection = (index: number) => {
-		// setSelectedSong(index);
-
 		submitAnswer(index);
 
 		const songsTiles = document.querySelectorAll(".song-picker-song") as NodeListOf<HTMLElement>;
@@ -176,7 +193,13 @@ function App() {
 
 	return (
 		<div className="main">
-			<Leaderboard players={lobbyPlayers} />
+			<div className='sidebar hidden'>
+				<Leaderboard players={lobbyPlayers} />
+				<div className='volume'>
+					<label htmlFor="volume">Volume</label>
+					<input id="volume" type='range' defaultValue={initialVolume} min={0} max={100} step={1} onChange={(e) => changeVolume(parseInt(e.target.value))} />
+				</div>
+			</div>
 			<div>
 				<div className="main-screen">
 					<h1>BARGEBO GUESSER</h1>
@@ -194,15 +217,12 @@ function App() {
 					</div>
 					<div className='game-screen-content hidden'>
 						<h1 className='timer hidden'><p>Timer:</p><p>0</p></h1>
-						<div className='volume'>
-							<label htmlFor="volume">Volume</label>
-							<input id="volume" type='range' defaultValue={initialVolume} min={0} max={100} step={1} onChange={(e) => changeVolume(parseInt(e.target.value))} />
-						</div>
 						<div className='host-controls hidden'>
-							<button className='submitButton' type="submit" onClick={() => startGame()}>Start</button>
 							<div>
 								<label>Number of rounds:</label>
 								<input id='rounds' type="number" min={1} max={30} placeholder="Number of rounds" />
+								<p id='feedback' className='error'></p>
+								<button className='submitButton' type="submit" onClick={() => startGame()}>Start</button>
 							</div>
 						</div>
 					</div>

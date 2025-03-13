@@ -143,7 +143,7 @@ async function announceRoundStart(lobbyName) {
 
     lobbies[lobbyName].players.forEach(player => player.choice = -1);
     lobbies[lobbyName].roundStarted = true;
-    lobbies[lobbyName].rounds -= 1;
+    lobbies[lobbyName].currentRound += 1;
     lobbies[lobbyName].firstAnswserPlayerId = '';
 
     console.log("Selecting tracks...");
@@ -172,7 +172,7 @@ async function announceRoundStart(lobbyName) {
             console.log(err);
             return;
         }
-        io.to(lobbyName).emit('onRoundStart', selectedTracks, correctIndex, data);
+        io.to(lobbyName).emit('onRoundStart', selectedTracks, correctIndex, data, lobbies[lobbyName].currentRound, lobbies[lobbyName].rounds);
     });
 
     lobbies[lobbyName].timePassed = 0;
@@ -206,8 +206,12 @@ async function announceRoundEnd(lobbyName) {
 
     io.to(lobbyName).emit('onRoundEnd');
 
-    if (lobbies[lobbyName].rounds > 0) {
+    if (lobbies[lobbyName].rounds - lobbies[lobbyName].currentRound > 0) {
         announceRoundStart(lobbyName);
+    } else {
+        console.log("Game ended.");
+        io.to(lobbyName).emit('onGameEnd');
+        delete lobbies[lobbyName];
     }
 }
 
@@ -221,11 +225,11 @@ io.on('connection', (socket) => {
             socket.emit('createLobbyResponse', lobbyName, 'Lobby already exists!');
             return;
         }
-
         
         lobbies[lobbyName] = {
             players: [{ id: socket.id, username: username, choice: -1, score: 0 }],
             roundStarted: false,
+            currentRound: 0,
             rounds: 0
         };
         socket.join(lobbyName);
@@ -310,7 +314,6 @@ io.on('connection', (socket) => {
         console.log("All players submitted their answers.");
         setTimeout(() => {
             announceRoundEnd(lobbyName);
-            // start next round
         }, 5000);
     });
 

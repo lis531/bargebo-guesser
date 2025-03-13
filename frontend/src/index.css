@@ -92,6 +92,12 @@ input[type='range'] {
     cursor: pointer;
 }
 
+.error {
+    color: #e25d68;
+    margin: 0.5em 0;
+    height: 24px;
+}
+
 .hidden {
     display: none !important;
 }

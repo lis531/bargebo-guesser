@@ -46,11 +46,18 @@
 		min-height: 30vh;
 	}
 
-	& > footer {
-		min-height: 30vh;
+	.start-screen-inputs {
 		display: flex;
 		flex-direction: column;
-		justify-content: end;
+		& > input {
+			margin-bottom: 1em;
+		}
+	}
+
+	.start-screen-buttons {
+		display: flex;
+		color: black;
+		gap: 1em;
 	}
 
 	.game-screen-content {
@@ -68,18 +75,11 @@
 		}
 	}
 
-	.start-screen-inputs {
+	& > footer {
+		min-height: 30vh;
 		display: flex;
 		flex-direction: column;
-		& > input {
-			margin-bottom: 1em;
-		}
-	}
-
-	.start-screen-buttons {
-		display: flex;
-		color: black;
-		gap: 1em;
+		justify-content: end;
 	}
 
 	.timer {
@@ -88,19 +88,6 @@
 		gap: 0.2em;
 		& > p {
 			margin: 0;
-		}
-	}
-
-	.volume {
-		display: flex;
-		flex-direction: column;
-		& > label {
-			text-indent: 0.3em;
-			margin-bottom: 0.1em;
-			font-size: large;
-		}
-		& > input {
-			margin-bottom: 1em;
 		}
 	}
 }
