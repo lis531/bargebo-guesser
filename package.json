@@ -1,0 +1,9 @@
+{
+    "name": "borgeboguesser",
+    "version": "0.0.0",
+    "scripts": {
+      "heroku-prebuild": "cd backend && npm install",
+      "start": "node backend/server.js"
+    }
+}
+  
