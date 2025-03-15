@@ -1,5 +1,5 @@
 import express from 'express';
-import http from 'http';
+import { createServer } from 'http';
 import { Server } from 'socket.io';
 import fs from 'fs';
 import admin from 'firebase-admin';
@@ -34,29 +34,21 @@ const bucket = admin.storage().bucket();
 const NUM_SONGS_TO_GUESS = 4;
 
 const app = express();
-
-const server = http.createServer(app, (req, res) => {
-    if (req.url.startsWith('/.well-known/pki-validation/')) {
-        const validationString = process.env.SSL_VALIDATION_STRING;
-        
-        if (validationString) {
-            res.writeHead(200, { 'Content-Type': 'text/plain' });
-            res.end(validationString);
-        } else {
-            res.writeHead(500, { 'Content-Type': 'text/plain' });
-            res.end('Validation string not found. Check your .env file.');
-        }
-    } else {
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('Not Found');
+const server = createServer(app); // Use HTTP (Heroku handles HTTPS)
+const io = new Server(server, {
+    cors: {
+        origin: "*", // Adjust this based on your frontend's URL
+        methods: ["GET", "POST"]
     }
 });
 
-const io = new Server(server, {
-    cors: {
-        origin: '*',
-        methods: ['GET', 'POST']
+const PORT = process.env.PORT || 2137;
+
+app.use((req, res, next) => {
+    if (req.headers['x-forwarded-proto'] !== 'https') {
+        return res.redirect(`https://${req.headers.host}${req.url}`);
     }
+    next();
 });
 
 let numberOfDownloads = 0;
@@ -287,8 +279,6 @@ io.on('connection', (socket) => {
     });
 });
 
-const port = process.env.PORT || 443;
-
-server.listen(port, () => {
-    console.log('Server running on port ' + port);
+server.listen(PORT, () => {
+    console.log('Server running on port:' + PORT);
 });
