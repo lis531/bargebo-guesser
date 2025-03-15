@@ -1,10 +1,7 @@
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
-import ytSearch from 'yt-search';
-import { exec } from 'child_process';
 import fs from 'fs';
-
 import admin from 'firebase-admin';
 import dotenv from 'dotenv';
 
@@ -37,92 +34,29 @@ const NUM_SONGS_TO_GUESS = 4;
 
 const app = express();
 
-const server = http.createServer(app);
+const server = http.createServer(app, (req, res) => {
+    if (req.url.startsWith('/.well-known/pki-validation/')) {
+        const validationString = process.env.SSL_VALIDATION_STRING;
+        
+        if (validationString) {
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.end(validationString);
+        } else {
+            res.writeHead(500, { 'Content-Type': 'text/plain' });
+            res.end('Validation string not found. Check your .env file.');
+        }
+    } else {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not Found');
+    }
+});
+
 const io = new Server(server, {
     cors: {
         origin: '*',
         methods: ['GET', 'POST']
     }
 });
-
-async function fetchTracks() {
-    const limit = 50;
-    const totalPages = 20;
-    let allTracks = [];
-
-    for (let page = 1; page <= totalPages; page++) {
-        const url = `http://ws.audioscrobbler.com/2.0/?method=chart.gettoptracks&api_key=${LAST_FM_API_KEY}&format=json&limit=${limit}&page=${page}`;
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (data.tracks && data.tracks.track) {
-            allTracks.push(...data.tracks.track);
-        }
-    }
-
-    console.log(`Fetched ${allTracks.length} tracks from Last.fm`);
-
-    const songs = allTracks.map(track => ({
-        title: track.name,
-        artist: track.artist.name,
-        id: ''
-    }));
-
-    return songs;
-}
-
-async function updateSongDB() {
-    let allSongs = await fetchTracks();
-
-    const BLOCK_SIZE = 100;
-    for (let blockID = 0; blockID < Math.ceil(allSongs.length / BLOCK_SIZE); blockID++) {
-        console.log("Starting block " + blockID + " at i=" + (blockID * BLOCK_SIZE));
-
-        const promises = [];
-        for (let i = blockID * BLOCK_SIZE, j = 0; i < allSongs.length && j < BLOCK_SIZE; i++, j++) {
-            const query = allSongs[i].title + " " + allSongs[i].artist;
-            promises.push(ytSearch(query));
-        }
-
-        for (let i = blockID * BLOCK_SIZE, j = 0; i < allSongs.length && j < BLOCK_SIZE; i++, j++) {
-            const result = await promises[j];
-            const videoURL = result.videos[0].url;
-            const videoID = videoURL.split('watch?v=')[1];
-            allSongs[i].id = videoID;
-
-            if ((i + 1) % 10 === 0) {
-                console.log("Processed " + (i + 1) + " out of " + allSongs.length + " songs.")
-            }
-        }
-    }
-
-    fs.writeFile('db.json', JSON.stringify(allSongs), (err) => {
-        if (err) {
-            console.error('Error writing file:', err);
-        } else {
-            console.log('File written successfully!');
-        }
-    });
-}
-
-async function downloadSongsDB(songsDB) {
-    const BLOCK_SIZE = 4;
-    for (let blockID = 0; blockID < Math.ceil(songsDB.length / BLOCK_SIZE); blockID++) {
-        console.log("Starting block " + blockID + " at i=" + (blockID * BLOCK_SIZE));
-
-        const promises = [];
-        for (let i = blockID * BLOCK_SIZE, j = 0; i < songsDB.length && j < BLOCK_SIZE; i++, j++) {
-            promises.push(downloadFirebase(songsDB[i].url));
-        }
-
-        for (let i = blockID * BLOCK_SIZE, j = 0; i < songsDB.length && j < BLOCK_SIZE; i++, j++) {
-            await promises[j];
-            if ((i + 1) % 10 === 0) {
-                console.log("Downloaded " + (i + 1) + " out of " + songsDB.length + " songs.")
-            }
-        }
-    }
-}
 
 let numberOfDownloads = 0;
 
@@ -162,63 +96,6 @@ async function downloadFirebase(videoUrl) {
     }
 }
 
-async function uploadFirebase(videoUrl) {
-    const videoID = videoUrl.split('watch?v=')[1];
-    const filePath = `audio/${videoID}.mp3`;
-    const file = bucket.file(`songs/${videoID}.mp3`);
-
-    try {
-        const [exists] = await file.exists();
-
-        if (exists) {
-            const [url] = await file.getSignedUrl({
-                action: 'read',
-                expires: '03-09-2030'
-            });
-            console.log(`${url} already exists in Firebase Storage.`);
-            return url;
-        }
-
-        return await new Promise((resolve, reject) => {
-            exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:10" --force-overwrites --audio-format mp3 -o "${filePath}" ${videoUrl}`, async (error) => {
-                if (error) {
-                    console.error(`Error downloading track: ${error.message}`);
-                    reject(error);
-                    return;
-                }
-
-                console.log(`Downloaded ${videoID}.mp3`);
-
-                try {
-                    const destination = `songs/${videoID}.mp3`;
-                    await bucket.upload(filePath, {
-                        destination,
-                        metadata: { contentType: 'audio/mpeg' }
-                    });
-
-                    console.log(`Uploaded ${videoID}.mp3 to Firebase Storage.`);
-
-                    const [url] = await bucket.file(destination).getSignedUrl({
-                        action: 'read',
-                        expires: '03-09-2030'
-                    });
-
-                    fs.unlinkSync(filePath);
-                    resolve(url);
-                } catch (uploadError) {
-                    console.error(`Error uploading to Firebase: ${uploadError.message}`);
-                    reject(uploadError);
-                }
-            });
-        });
-    } catch (err) {
-        console.error(`Unexpected error: ${err.message}`);
-        return null;
-    }
-}
-
-// await updateSongDB();
-
 const lobbies = {};
 
 const allSongs = JSON.parse(fs.readFileSync(`./db.json`, 'utf8'));
@@ -228,7 +105,6 @@ for (let i = 0; i < allSongs.length; i++) {
     delete allSongs[i].id;
 }
 
-// await downloadSongsDB(allSongs);
 console.log("Loaded the songs DB of " + allSongs.length + " songs.");
 console.log("Downloaded " + numberOfDownloads + " songs.");
 
@@ -410,6 +286,6 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(2137, () => {
-    console.log('Server running on port 2137');
+server.listen(443, () => {
+    console.log('Server running on port 443');
 });
