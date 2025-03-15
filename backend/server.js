@@ -287,6 +287,8 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(443, () => {
-    console.log('Server running on port 443');
+const port = process.env.PORT || 443;
+
+server.listen(port, () => {
+    console.log('Server running on port ' + port);
 });
