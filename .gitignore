@@ -24,3 +24,4 @@ dist-ssr
 *.sw?
 *.mp3
 secrets.*
+backend/firebase-admin-key.json

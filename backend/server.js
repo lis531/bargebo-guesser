@@ -1,17 +1,25 @@
 import express from 'express';
 import http from 'http';
-import https from 'https';
 import { Server } from 'socket.io';
-import cors from 'cors';
 import ytSearch from 'yt-search';
 import { exec } from 'child_process';
 import fs from 'fs';
 import LAST_FM_API_KEY from './secrets.js';
 
+import admin from 'firebase-admin';
+
+const serviceAccount = JSON.parse(fs.readFileSync('firebase-admin-key.json', 'utf8'));
+
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    storageBucket: "bargebo-27328.firebasestorage.app"
+});
+
+const bucket = admin.storage().bucket();
+
 const NUM_SONGS_TO_GUESS = 4;
 
 const app = express();
-app.use(cors());
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -47,28 +55,6 @@ async function fetchTracks() {
     return songs;
 }
 
-async function downloadSong(videoUrl) {
-    const videoID = videoUrl.split('watch?v=')[1];
-
-    if (fs.existsSync('audio/' + videoID + '.mp3')) {
-        return new Promise((resolve, reject) => {
-            resolve(`${videoID}.mp3`);
-        });
-    }
-
-    return new Promise((resolve, reject) => {
-        exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:10" --force-overwrites --audio-format mp3 -o "audio/${videoID}.%(ext)s" ${videoUrl}`, (error, stdout, stderr) => {
-            if (error) {
-                console.error(`Error downloading track: ${error.message}`);
-                reject(error);
-            } else {
-                console.log(`Track downloaded: ${stdout}`);
-                resolve(`${videoID}.mp3`);
-            }
-        });
-    });
-}
-
 async function updateSongDB() {
     let allSongs = await fetchTracks();
 
@@ -77,12 +63,12 @@ async function updateSongDB() {
         console.log("Starting block " + blockID + " at i=" + (blockID * BLOCK_SIZE));
 
         const promises = [];
-        for (let i = blockID * BLOCK_SIZE, j = 0; i < allSongs.length, j < BLOCK_SIZE; i++, j++) {
+        for (let i = blockID * BLOCK_SIZE, j = 0; i < allSongs.length && j < BLOCK_SIZE; i++, j++) {
             const query = allSongs[i].title + " " + allSongs[i].artist;
             promises.push(ytSearch(query));
         }
 
-        for (let i = blockID * BLOCK_SIZE, j = 0; i < allSongs.length, j < BLOCK_SIZE; i++, j++) {
+        for (let i = blockID * BLOCK_SIZE, j = 0; i < allSongs.length && j < BLOCK_SIZE; i++, j++) {
             const result = await promises[j];
             const videoURL = result.videos[0].url;
             const videoID = videoURL.split('watch?v=')[1];
@@ -109,13 +95,12 @@ async function downloadSongsDB(songsDB) {
         console.log("Starting block " + blockID + " at i=" + (blockID * BLOCK_SIZE));
 
         const promises = [];
-        for (let i = blockID * BLOCK_SIZE, j = 0; i < songsDB.length, j < BLOCK_SIZE; i++, j++) {
-            promises.push(downloadSong(songsDB[i].url));
+        for (let i = blockID * BLOCK_SIZE, j = 0; i < songsDB.length && j < BLOCK_SIZE; i++, j++) {
+            promises.push(downloadFirebase(songsDB[i].url));
         }
 
-        for (let i = blockID * BLOCK_SIZE, j = 0; i < songsDB.length, j < BLOCK_SIZE; i++, j++) {
+        for (let i = blockID * BLOCK_SIZE, j = 0; i < songsDB.length && j < BLOCK_SIZE; i++, j++) {
             await promises[j];
-
             if ((i + 1) % 10 === 0) {
                 console.log("Downloaded " + (i + 1) + " out of " + songsDB.length + " songs.")
             }
@@ -123,7 +108,100 @@ async function downloadSongsDB(songsDB) {
     }
 }
 
-//await updateSongDB();
+let numberOfDownloads = 0;
+
+function streamToBuffer(stream) {
+    return new Promise((resolve, reject) => {
+        const chunks = [];
+        stream.on('data', (chunk) => chunks.push(chunk));
+        stream.on('end', () => resolve(Buffer.concat(chunks)));
+        stream.on('error', reject);
+    });
+}
+
+async function downloadFirebase(videoUrl) {
+    try {
+        const videoID = videoUrl.split('watch?v=')[1];
+        const file = bucket.file(`songs/${videoID}.mp3`);
+        const [exists] = await file.exists();
+
+        if (exists) {
+            const [url] = await file.getSignedUrl({
+                action: 'read',
+                expires: '03-09-2030'
+            });
+            console.log(`${url} already exists in Firebase Storage.`);
+
+            const stream = file.createReadStream();
+            const buffer = await streamToBuffer(stream);
+            const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+            return arrayBuffer;
+        } else {
+            console.log("Song does not exist in Firebase Storage.");
+            return null;
+        }
+    } catch (err) {
+        console.error(`Error downloading from Firebase: ${err.message}`);
+        return null;
+    }
+}
+
+async function uploadFirebase(videoUrl) {
+    const videoID = videoUrl.split('watch?v=')[1];
+    const filePath = `audio/${videoID}.mp3`;
+    const file = bucket.file(`songs/${videoID}.mp3`);
+
+    try {
+        const [exists] = await file.exists();
+
+        if (exists) {
+            const [url] = await file.getSignedUrl({
+                action: 'read',
+                expires: '03-09-2030'
+            });
+            console.log(`${url} already exists in Firebase Storage.`);
+            return url;
+        }
+
+        return await new Promise((resolve, reject) => {
+            exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:10" --force-overwrites --audio-format mp3 -o "${filePath}" ${videoUrl}`, async (error) => {
+                if (error) {
+                    console.error(`Error downloading track: ${error.message}`);
+                    reject(error);
+                    return;
+                }
+
+                console.log(`Downloaded ${videoID}.mp3`);
+
+                try {
+                    const destination = `songs/${videoID}.mp3`;
+                    await bucket.upload(filePath, {
+                        destination,
+                        metadata: { contentType: 'audio/mpeg' }
+                    });
+
+                    console.log(`Uploaded ${videoID}.mp3 to Firebase Storage.`);
+
+                    const [url] = await bucket.file(destination).getSignedUrl({
+                        action: 'read',
+                        expires: '03-09-2030'
+                    });
+
+                    fs.unlinkSync(filePath);
+                    resolve(url);
+                } catch (uploadError) {
+                    console.error(`Error uploading to Firebase: ${uploadError.message}`);
+                    reject(uploadError);
+                }
+            });
+        });
+    } catch (err) {
+        console.error(`Unexpected error: ${err.message}`);
+        return null;
+    }
+}
+
+// await updateSongDB();
 
 const lobbies = {};
 
@@ -134,9 +212,9 @@ for (let i = 0; i < allSongs.length; i++) {
     delete allSongs[i].id;
 }
 
-//await downloadSongsDB(allSongs);
-
+// await downloadSongsDB(allSongs);
 console.log("Loaded the songs DB of " + allSongs.length + " songs.");
+console.log("Downloaded " + numberOfDownloads + " songs.");
 
 async function announceRoundStart(lobbyName) {
     if (!lobbies[lobbyName]) return;
@@ -150,7 +228,6 @@ async function announceRoundStart(lobbyName) {
     const selectedTracks = [];
     for (let i = 0; i < NUM_SONGS_TO_GUESS; i++) {
         const randomIndex = Math.floor(Math.random() * allSongs.length);
-
         selectedTracks.push(allSongs[randomIndex]);
     }
 
@@ -160,20 +237,19 @@ async function announceRoundStart(lobbyName) {
     const correctVideoUrl = selectedTracks[correctIndex].url;
     lobbies[lobbyName].correctIndex = correctIndex;
 
-    console.log("Starting download...");
+    console.log("Fetching song from Firebase...");
 
-    const videoID = correctVideoUrl.split('watch?v=')[1];
-    await downloadSong(correctVideoUrl);
+    let correctSongData = await downloadFirebase(correctVideoUrl);
+    if (!correctSongData) {
+        const url = await uploadFirebase(correctVideoUrl);
+        if (url) {
+            correctSongData = await downloadFirebase(correctVideoUrl);
+        }
+    }
 
     console.log("Starting round...");
 
-    fs.readFile(`audio/${videoID}.mp3`, (err, data) => {
-        if (err !== null) {
-            console.log(err);
-            return;
-        }
-        io.to(lobbyName).emit('onRoundStart', selectedTracks, correctIndex, data, lobbies[lobbyName].currentRound, lobbies[lobbyName].rounds);
-    });
+    io.to(lobbyName).emit('onRoundStart', selectedTracks, correctIndex, correctSongData, lobbies[lobbyName].currentRound, lobbies[lobbyName].rounds);
 
     lobbies[lobbyName].timePassed = 0;
 
@@ -184,7 +260,6 @@ async function announceRoundStart(lobbyName) {
         }
 
         lobbies[lobbyName].timePassed += 0.01;
-
         io.to(lobbyName).emit('timerChange', lobbies[lobbyName].timePassed.toFixed(2));
 
         if (lobbies[lobbyName].timePassed >= 20) {
@@ -201,9 +276,7 @@ async function announceRoundEnd(lobbyName) {
     }
 
     clearInterval(lobbies[lobbyName].timeInterval);
-
     lobbies[lobbyName].roundStarted = false;
-
     io.to(lobbyName).emit('onRoundEnd');
 
     if (lobbies[lobbyName].rounds - lobbies[lobbyName].currentRound > 0) {
@@ -217,7 +290,6 @@ async function announceRoundEnd(lobbyName) {
 
 io.on('connection', (socket) => {
     console.log(`Client connected: ${socket.id}`);
-
     socket.emit('onLobbyListChanged', Object.keys(lobbies));
 
     socket.on('createLobby', async (lobbyName, username) => {
@@ -225,7 +297,7 @@ io.on('connection', (socket) => {
             socket.emit('createLobbyResponse', lobbyName, 'Lobby already exists!');
             return;
         }
-        
+
         lobbies[lobbyName] = {
             players: [{ id: socket.id, username: username, choice: -1, score: 0 }],
             roundStarted: false,
@@ -233,11 +305,9 @@ io.on('connection', (socket) => {
             rounds: 0
         };
         socket.join(lobbyName);
-        
         socket.emit('createLobbyResponse', lobbyName, '');
         io.emit('onLobbyListChanged', Object.keys(lobbies));
         io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
-
         console.log(`Lobby created: ${lobbyName}, by: ${username}`);
     });
 
@@ -260,25 +330,20 @@ io.on('connection', (socket) => {
 
         lobbies[lobbyName].players.push({ id: socket.id, username: username, choice: -1, score: 0 });
         socket.join(lobbyName);
-
         socket.emit('joinLobbyResponse', '');
         io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
-
         console.log(`User ${username} joined lobby: ${lobbyName}`);
     });
 
     socket.on('announceGameStart', async (lobbyName, rounds) => {
         if (!lobbies[lobbyName]) return;
-
         lobbies[lobbyName].rounds = rounds;
-
         io.to(lobbyName).emit('onGameStart');
-        
         announceRoundStart(lobbyName);
     });
 
     socket.on('announceRoundStart', async (lobbyName) => {
-        announceRoundStart(socket, lobbyName);
+        announceRoundStart(lobbyName);
     });
 
     socket.on('submitAnswer', async (lobbyName, choiceIndex) => {
@@ -321,7 +386,6 @@ io.on('connection', (socket) => {
         for (const lobby in lobbies) {
             lobbies[lobby].players = lobbies[lobby].players.filter(p => p.id !== socket.id);
             io.to(lobby).emit('onPlayersChanged', lobbies[lobby].players.sort((a, b) => b.score - a.score));
-
             if (lobbies[lobby].players.length === 0) {
                 delete lobbies[lobby];
                 io.emit('onLobbyListChanged', Object.keys(lobbies));
