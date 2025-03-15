@@ -4,8 +4,8 @@ import SongPicker from './SongPicker.tsx';
 import Leaderboard from './Leaderboard.tsx';
 import { io } from "socket.io-client";
 
-// const socket = io("https://130.162.248.218:2137");
-const socket = io("https://borgebo-47c8fb2120b5.herokuapp.com/");
+// const socket = io("http://localhost:2137/");
+const socket = io("https://bargebo-00fc4919d1db.herokuapp.com/");
 
 function App() {
 	const [lobbyName, setLobbyName] = useState<string>("");
@@ -20,13 +20,10 @@ function App() {
 	const sourceAudioBufferRef = useRef<AudioBufferSourceNode | null>(null);
 
 	useEffect(() => {
-		const audioContext = new AudioContext();
-		audioContextRef.current = audioContext;
-		const gainNode = audioContext.createGain();
-		gainNode.gain.value = 0.25;
-		gainNode.connect(audioContext.destination);
-		gainNodeRef.current = gainNode;
-		changeVolume(initialVolume);
+		audioContextRef.current = new AudioContext();
+		gainNodeRef.current = audioContextRef.current.createGain();
+		gainNodeRef.current.gain.value = 0.25;
+		gainNodeRef.current.connect(audioContextRef.current.destination);
 
 		const handleLobbyListChange = (lobbyNames: any[]) => {
 			console.log("Lobby names changed: ", lobbyNames);
@@ -76,6 +73,11 @@ function App() {
 		});
 
 		socket.on('onRoundStart', async (allSongs, correctIndex, correctSongData, currentRounds, rounds) => {
+			if (sourceAudioBufferRef.current !== null) {
+				sourceAudioBufferRef.current.stop();
+				sourceAudioBufferRef.current = null;
+			}
+
 			resetSongSelection();
 			setCorrectSongIndex(correctIndex);
 			setSongs(allSongs);

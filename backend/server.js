@@ -22,8 +22,6 @@ const serviceAccount = {
     universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN
 };
 
-const LAST_FM_API_KEY = process.env.LAST_FM_API_KEY;
-
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
     storageBucket: "bargebo-27328.firebasestorage.app"
@@ -34,10 +32,10 @@ const bucket = admin.storage().bucket();
 const NUM_SONGS_TO_GUESS = 4;
 
 const app = express();
-const server = createServer(app); // Use HTTP (Heroku handles HTTPS)
+const server = createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "*", // Adjust this based on your frontend's URL
+        origin: "*",
         methods: ["GET", "POST"]
     }
 });
@@ -131,7 +129,6 @@ async function announceRoundStart(lobbyName) {
             correctSongData = await downloadFirebase(correctVideoUrl);
         }
     }
-
     console.log("Starting round...");
 
     io.to(lobbyName).emit('onRoundStart', selectedTracks, correctIndex, correctSongData, lobbies[lobbyName].currentRound, lobbies[lobbyName].rounds);
@@ -224,7 +221,6 @@ io.on('connection', (socket) => {
         if (!lobbies[lobbyName]) return;
         lobbies[lobbyName].rounds = rounds;
         io.to(lobbyName).emit('onGameStart');
-        announceRoundStart(lobbyName);
     });
 
     socket.on('announceRoundStart', async (lobbyName) => {
