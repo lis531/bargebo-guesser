@@ -13,7 +13,6 @@ function App() {
 	const [lobbyPlayers, setLobbyPlayers] = useState<any[]>([]);
 	const [songs, setSongs] = useState<{ title: string; artist: string; cover: string; url: string; }[]>([]);
 	const [correctSongIndex, setCorrectSongIndex] = useState<number>();
-	const [isGameUIOn, switchGameUI] = useState(false);
 	
 	const initialVolume = Number(localStorage.getItem('volume')) || 50;
 	const audioContextRef = useRef<AudioContext | null>(null);
@@ -55,7 +54,7 @@ function App() {
 				console.log("Error while creating a lobby: ", err);
 				return;
 			}
-			switchGameUI(true);
+			switchGameUI();
 			document.querySelector(".host-controls")?.classList.remove("hidden");
 			document.querySelector('.timer')?.classList.add('invisible');
 			document.querySelector('.song-picker')?.classList.add('invisible');
@@ -67,7 +66,7 @@ function App() {
 				console.log("Error while joining a lobby: ", err);
 				return;
 			}
-			switchGameUI(true);
+			switchGameUI();
 			console.log("Successfully joined a lobby called: ", lobbyName);
 		});
 
@@ -103,7 +102,7 @@ function App() {
 				sourceAudioBufferRef.current = null;
 			}
 			console.log("Game ended.");
-			switchGameUI(false);
+			switchGameUI();
 		});
 
 		socket.on('onRoundEnd', () => {
@@ -131,14 +130,14 @@ function App() {
 		};
 	}, []);
 
-	useEffect(() => {
+	const switchGameUI = () => {
 		console.log("Switching UI");
 		document.querySelector(".start-screen-content")?.classList.toggle("hidden");
 		document.querySelector("footer")?.classList.toggle("hidden");
 		document.querySelector(".game-screen-content")?.classList.toggle("hidden");
 		document.querySelector(".song-picker")?.classList.toggle("hidden");
 		document.querySelector(".sidebar")?.classList.toggle("hidden");
-	}, [isGameUIOn]);
+	};
 
 	const createLobby = () => {
 		if (lobbyName && username) {
