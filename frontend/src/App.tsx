@@ -13,7 +13,7 @@ function App() {
 	const [lobbyPlayers, setLobbyPlayers] = useState<any[]>([]);
 	const [songs, setSongs] = useState<{ title: string; artist: string; cover: string; url: string; }[]>([]);
 	const [correctSongIndex, setCorrectSongIndex] = useState<number>();
-	const [isGameUIOn, switchGameUI] = useState(false);
+	const [isGameUIOn, switchGameUI] = useState<boolean>();
 	
 	const initialVolume = Number(localStorage.getItem('volume')) || 50;
 	const audioContextRef = useRef<AudioContext | null>(null);
