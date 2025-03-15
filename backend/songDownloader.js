@@ -1,5 +1,6 @@
 import ytSearch from 'yt-search';
 import { exec } from 'child_process';
+import fs from 'fs';
 
 import admin from 'firebase-admin';
 import dotenv from 'dotenv';
@@ -19,6 +20,13 @@ const serviceAccount = {
     client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
     universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN
 };
+
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    storageBucket: "bargebo-27328.firebasestorage.app"
+});
+
+const bucket = admin.storage().bucket();
 
 const LAST_FM_API_KEY = process.env.LAST_FM_API_KEY;
 
@@ -117,7 +125,7 @@ async function uploadFirebase(videoUrl) {
                 action: 'read',
                 expires: '03-09-2030'
             });
-            console.log(`${url} already exists in Firebase Storage.`);
+            //console.log(`already exists in Firebase Storage.`);
             return url;
         }
 
@@ -161,7 +169,7 @@ async function uploadFirebase(videoUrl) {
 async function downloadSongsDB(songsDB) {
     const BLOCK_SIZE = 4;
     for (let blockID = 0; blockID < Math.ceil(songsDB.length / BLOCK_SIZE); blockID++) {
-        console.log("Starting block " + blockID + " at i=" + (blockID * BLOCK_SIZE));
+        //console.log("Starting block " + blockID + " at i=" + (blockID * BLOCK_SIZE));
 
         const promises = [];
         for (let i = blockID * BLOCK_SIZE, j = 0; i < songsDB.length && j < BLOCK_SIZE; i++, j++) {
@@ -171,19 +179,14 @@ async function downloadSongsDB(songsDB) {
 
         for (let i = blockID * BLOCK_SIZE, j = 0; i < songsDB.length && j < BLOCK_SIZE; i++, j++) {
             await promises[j];
-            if ((i + 1) % 10 === 0) {
+            if ((i + 1) % 100 === 0) {
                 console.log("Downloaded " + (i + 1) + " out of " + songsDB.length + " songs.")
             }
         }
     }
 }
 
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    storageBucket: "bargebo-27328.firebasestorage.app"
-});
-
-await updateSongDB();
+//await updateSongDB();
 
 const allSongs = JSON.parse(fs.readFileSync(`./db.json`, 'utf8'));
 for (let i = 0; i < allSongs.length; i++) {
