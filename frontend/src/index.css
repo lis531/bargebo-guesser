@@ -11,13 +11,22 @@
 }
 
 :root {
+    --background-color: #1b2027;
+    --text-color: rgba(255, 255, 255, 0.87);
+    --link-color: #646cff;
+    --link-hover-color: #535bf2;
+    --button-background-color: #1a1a1a;
+    --button-hover-color: #646cff;
+    --error-color: #e25d68;
+    --correct-color: #00ff00;
+
     font-family: 'DM Sans';
     line-height: 1.5;
     font-weight: 400;
 
     color-scheme: light dark;
-    color: rgba(255, 255, 255, 0.87);
-    background-color: #1b2027;
+    color: var(--text-color);
+    background-color: var(--background-color);
 
     font-synthesis: none;
     text-rendering: optimizeLegibility;
@@ -27,12 +36,12 @@
 
 a {
     font-weight: 500;
-    color: #646cff;
+    color: var(--link-color);
     text-decoration: inherit;
 }
 
 a:hover {
-    color: #535bf2;
+    color: var(--link-hover-color);
 }
 
 body {
@@ -56,14 +65,14 @@ button {
     font-size: 1em;
     font-weight: 500;
     font-family: inherit;
-    background-color: #1a1a1a;
+    background-color: var(--button-background-color);
     cursor: pointer;
     transition: border-color 0.25s;
     box-shadow: 0 0 3px 1px #000000;
 }
 
 button:hover {
-    border-color: #646cff;
+    border-color: var(--link-hover-color);
 }
 
 button:focus,
@@ -75,8 +84,7 @@ input[type='text'], input[type='number'] {
     padding: 0.5em;
     border-radius: 8px;
     border: 2px solid transparent;
-    background-color: #1a1a1a;
-    color: white;
+    background-color: var(--button-background-color);
     font-size: 1em;
     font-weight: 500;
     font-family: inherit;
@@ -84,7 +92,7 @@ input[type='text'], input[type='number'] {
     box-shadow: 0 0 3px 1px #000000;
 
     &:focus {
-        border-color: #646cff;
+        border-color: var(--link-hover-color);
     }
 }
 
@@ -93,7 +101,7 @@ input[type='range'] {
 }
 
 .error {
-    color: #e25d68;
+    color: var(--error-color);
     margin: 0.5em 0;
     height: 24px;
 }
@@ -108,15 +116,13 @@ input[type='range'] {
 
 @media (prefers-color-scheme: light) {
     :root {
-        color: #213547;
-        background-color: #ffffff;
-    }
-
-    a:hover {
-        color: #747bff;
-    }
-
-    button {
-        background-color: #f9f9f9;
+        --background-color: #f9f9f9;
+        --text-color: #333;
+        --link-color: #747bff;
+        --link-hover-color: #535bf2;
+        --button-background-color: #f9f9f9;
+        --button-hover-color: #646cff;
+        --error-color: #e25d68;
+        --correct-color: #00ff00;
     }
 }
