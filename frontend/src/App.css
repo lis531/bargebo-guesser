@@ -7,7 +7,6 @@
 	flex-direction: row;
 	align-items: center;
 	height: 100vh;
-	color: white;
 	& > div:last-of-type {
 		display: flex;
 		flex-direction: column;
@@ -23,12 +22,12 @@
 	align-items: center;
 	justify-content: space-around;
 	height: 100vh;
-	color: white;
 
 	& > h1 {
 		font-family: 'Syne';
 		font-size: 5em;
 		min-height: 20vh;
+		text-align: center;
 	}
 
 	label {
@@ -56,7 +55,6 @@
 
 	.start-screen-buttons {
 		display: flex;
-		color: black;
 		gap: 1em;
 	}
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import './App.css';
 import SongPicker from './SongPicker.tsx';
 import Leaderboard from './Leaderboard.tsx';
+import GameSummary from './GameSummary.tsx';
 import { io } from "socket.io-client";
 
 // const socket = io("http://localhost:2137/");
@@ -104,7 +105,12 @@ function App() {
 				sourceAudioBufferRef.current = null;
 			}
 			console.log("Game ended.");
-			switchGameUI();
+			document.querySelector('.game-screen-content')?.classList.add('hidden');
+			document.querySelector('.song-picker')?.classList.add('hidden');
+			document.querySelector('.game-summary')?.classList.remove('hidden');
+			document.querySelector('.sidebar')?.classList.add('hidden');
+			document.querySelector('footer')?.classList.remove('hidden');
+			// switchGameUI();
 		});
 
 		socket.on('onRoundEnd', () => {
@@ -139,6 +145,11 @@ function App() {
 		document.querySelector(".game-screen-content")?.classList.toggle("hidden");
 		document.querySelector(".song-picker")?.classList.toggle("hidden");
 		document.querySelector(".sidebar")?.classList.toggle("hidden");
+	};
+
+	const switchOnLeaveUI = () => {
+		document.querySelector(".game-summary")?.classList.toggle("hidden");
+		document.querySelector(".start-screen-content")?.classList.toggle("hidden");
 	};
 
 	const createLobby = () => {
@@ -192,6 +203,12 @@ function App() {
 		if (gainNodeRef.current) {
 			gainNodeRef.current.gain.value = volume / 200;
 		}
+	};
+
+	const onLeaveLobby = () => {
+		socket.emit('leaveLobby', lobbyName);
+		setLobbyPlayers([]);
+		switchOnLeaveUI();
 	};
 
 	return (
@@ -250,6 +267,7 @@ function App() {
 						</div>
 					</div>
 					<SongPicker songs={songs} onSongSelect={onSongSelection} />
+					<GameSummary players={lobbyPlayers} onLeaveLobby={onLeaveLobby} />
 					<footer>Borys Gajewki & Mateusz Antkiewicz @ 2025</footer>
 				</div>
 			</div>
