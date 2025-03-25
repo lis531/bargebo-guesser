@@ -26,8 +26,11 @@
 	& > h1 {
 		font-family: 'Syne';
 		font-size: 5em;
-		min-height: 20vh;
+		height: 20vh;
 		text-align: center;
+		@media screen and (max-width: 1000px) {
+			height: auto;			
+		}
 	}
 
 	label {
@@ -42,7 +45,7 @@
 		justify-content: center;
 		gap: 1em;
 		justify-self: center;
-		min-height: 30vh;
+		height: 30vh;
 	}
 
 	.start-screen-inputs {
@@ -65,16 +68,19 @@
 		gap: 1em;
 		justify-self: center;
 		width: 300px;
-		min-height: 30vh;
+		height: 30vh;
 		.host-controls > div {
 			display: flex;
 			flex-direction: column;
 			justify-content: center;
 		}
+		@media screen and (max-width: 1000px) {
+			height: 10vh;
+		}
 	}
 
 	& > footer {
-		min-height: 30vh;
+		height: 40vh;
 		display: flex;
 		flex-direction: column;
 		justify-content: end;

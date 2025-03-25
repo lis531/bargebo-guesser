@@ -2,13 +2,17 @@
     display: flex;
     align-items: center;
     flex-direction: column;
-    margin: 2em;
-    min-height: 30vh;
+    margin: 0 3vw;
+    height: 40vh;
+    @media screen and (max-width: 1000px) {
+        height: auto;
+    }
 }
 
 .song-picker-songs {
     display: flex;
     flex-wrap: wrap;
+    justify-content: center;
     gap: 2em;
 }
 

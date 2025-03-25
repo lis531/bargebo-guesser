@@ -1,4 +1,5 @@
-import './SongPicker.css'
+import './SongPicker.css';
+import confetti from 'canvas-confetti';
 
 interface Props {
     songs: {
@@ -10,17 +11,34 @@ interface Props {
 }
 
 function SongPicker({ songs, onSongSelect }: Props) {
+    const triggerConfetti = (tile: HTMLElement) => {
+        const rect = tile.getBoundingClientRect();
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+
+        confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { x: x / window.innerWidth, y: y / window.innerHeight },
+            colors: ['#ff0', '#0f0', '#00f'],
+        });
+    };
+
     const songSelected = (index: number) => {
         let songsTiles = document.querySelectorAll(".song-picker-song") as NodeListOf<HTMLElement>;
         Array.from(songsTiles).map((tile) => {
             if (tile.id == index.toString() && !tile.classList.contains("disabled")) {
                 tile.classList.add("selected");
                 onSongSelect(index);
+
+                if (tile.classList.contains("correct")) {
+                    triggerConfetti(tile);
+                }
             }
             tile.classList.add("disabled");
             return tile;
         });
-    }
+    };
 
     return (
         <div className="song-picker hidden invisible">
@@ -37,7 +55,7 @@ function SongPicker({ songs, onSongSelect }: Props) {
                 ))}
             </div>
         </div>
-    )
+    );
 }
 
 export default SongPicker;
