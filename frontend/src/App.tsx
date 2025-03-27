@@ -128,7 +128,7 @@ function App() {
 
 		socket.on('timerChange', (timePassed) => {
 			const timerElement = document.querySelector('.timer');
-			timerElement.innerHTML = "Time: " + timePassed + "s"
+			timerElement!.innerHTML = "Time: " + timePassed + "s"
 		});
 
 		return () => {
