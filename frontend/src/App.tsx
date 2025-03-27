@@ -65,12 +65,16 @@ function App() {
 				return;
 			}
 			switchGameUI();
+			document.querySelector('.timer')?.classList.add('hidden');
+			document.querySelector('.song-picker')?.classList.add('hidden');
 			console.log("Successfully joined a lobby called: ", lobbyName);
 		});
 
 		socket.on('onGameStart', () => {
 			document.querySelector('.host-controls')?.classList.add('hidden');
 			document.querySelector('.timer')?.classList.remove('hidden');
+			document.querySelector('.song-picker')?.classList.remove('hidden');
+			document.querySelector('footer')?.classList.add('hidden');
 		});
 
 		socket.on('onRoundStart', async (allSongs, correctIndex, correctSongData, currentRounds, rounds) => {
@@ -123,10 +127,8 @@ function App() {
 		});
 
 		socket.on('timerChange', (timePassed) => {
-			const timerParagraphs = document.querySelectorAll('.timer > p');
-			if (timerParagraphs.length > 1) {
-				timerParagraphs[1].innerHTML = timePassed.toString();
-			}
+			const timerElement = document.querySelector('.timer');
+			timerElement.innerHTML = "Time: " + timePassed + "s"
 		});
 
 		return () => {
@@ -141,9 +143,7 @@ function App() {
 	const switchGameUI = () => {
 		console.log("Switching UI");
 		document.querySelector(".start-screen-content")?.classList.toggle("hidden");
-		document.querySelector("footer")?.classList.toggle("hidden");
 		document.querySelector(".game-screen-content")?.classList.toggle("hidden");
-		document.querySelector(".song-picker")?.classList.toggle("hidden");
 		document.querySelector(".sidebar")?.classList.toggle("hidden");
 	};
 
@@ -256,7 +256,7 @@ function App() {
 						</div>
 					</div>
 					<div className='game-screen-content hidden'>
-						<h1 className='timer hidden'><p>Timer:</p><p>0</p></h1>
+						<h2 className='timer hidden'>Time: 0s</h2>
 						<div className='host-controls hidden'>
 							<div>
 								<label>Number of rounds:</label>

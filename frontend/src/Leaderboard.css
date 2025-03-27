@@ -9,7 +9,7 @@
     background-color: rgba(0, 0, 0, 0.1);
     font-weight: bold;
     text-align: center;
-    box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.5);
+    box-shadow: 0 0 3px 1px rgba(0, 0, 0, 0.5);
     & > h2 {
         margin-top: 30%;
     }
@@ -32,7 +32,6 @@
 }
 
 .leaderboard {
-    padding: 0 7%;
     width: 86%;
 }
 
@@ -41,8 +40,6 @@
     flex-direction: column;
     align-items: center;
     padding: 10px;
-    border-radius: 10px;
-    box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.5);
 }
 
 .leaderboard-player {
