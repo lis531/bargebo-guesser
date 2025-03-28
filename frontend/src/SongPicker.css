@@ -18,9 +18,15 @@
     grid-template-columns: repeat(auto-fit, minmax(18ch, 1fr));
     grid-auto-rows: auto;
     justify-items: center;
-    gap: clamp(1rem, 3vw, 3rem);
+    gap: clamp(1rem, 3vw, 2rem);
     @media screen and (max-width: 1000px) {
         grid-template-columns: 1fr 1fr;
+        & > :nth-child(odd) {
+            justify-self: end;
+        }
+        & > :nth-child(even) {
+            justify-self: start;
+        }
     }
 }
 

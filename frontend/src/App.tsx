@@ -114,7 +114,6 @@ function App() {
 			document.querySelector('.game-summary')?.classList.remove('hidden');
 			document.querySelector('.sidebar')?.classList.add('hidden');
 			document.querySelector('footer')?.classList.remove('hidden');
-			// switchGameUI();
 		});
 
 		socket.on('onRoundEnd', () => {
@@ -127,8 +126,8 @@ function App() {
 		});
 
 		socket.on('timerChange', (timePassed) => {
-			const timerElement = document.querySelector('.timer');
-			timerElement!.innerHTML = "Time: " + timePassed + "s"
+			const timerElement = document.querySelector('.timer') as HTMLElement;
+			timerElement!.innerHTML = `Time: ${Math.floor(timePassed)}.<small>${timePassed.toString().split('.')[1]}</small>s`
 		});
 
 		return () => {

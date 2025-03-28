@@ -74,7 +74,7 @@
 	.game-screen-content {
 		display: flex;
 		flex-direction: column;
-		justify-content: end;
+		justify-content: center;
 		gap: 1em;
 		justify-self: center;
 		width: 300px;
@@ -86,6 +86,9 @@
 		}
 		@media screen and (max-width: 1000px) {
 			height: 35vh;
+			&:has(.timer:not(.invisible)) {
+				height: auto;
+			}
 		}
 	}
 
@@ -98,7 +101,7 @@
 
 	.timer {
 		display: flex;
-		justify-content: space-between;
+		align-items: baseline;
 		margin: 0 0 0.5em 0;
 		@media screen and (max-width: 450px) {
 			flex-direction: column;
