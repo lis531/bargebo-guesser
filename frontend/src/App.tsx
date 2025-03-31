@@ -74,7 +74,6 @@ function App() {
 			document.querySelector('.host-controls')?.classList.add('hidden');
 			document.querySelector('.timer')?.classList.remove('hidden');
 			document.querySelector('.song-picker')?.classList.remove('hidden');
-			document.querySelector('footer')?.classList.add('hidden');
 		});
 
 		socket.on('onRoundStart', async (allSongs, correctIndex, correctSongData, currentRounds, rounds) => {
@@ -91,7 +90,10 @@ function App() {
 			roundNumber.innerHTML = `Round: ${currentRounds} / ${rounds}`;
 
 			document.querySelector('.timer')?.classList.remove('invisible');
-			document.querySelector('.song-picker')?.classList.remove('invisible');
+			if (document.querySelector('.song-picker')?.classList.contains('invisible')) {
+				document.querySelector('.song-picker')?.classList.remove('invisible');
+				document.querySelector('.song-picker')?.animate([{ transform: 'translateY(100%)' }, { transform: 'translateY(0%)'}], { duration: 500, easing: 'ease', fill: 'forwards' });
+			}
 
 			audioContextRef.current!.decodeAudioData(correctSongData, (buffer) => {
 				sourceAudioBufferRef.current = audioContextRef.current!.createBufferSource();
@@ -110,10 +112,14 @@ function App() {
 			}
 			console.log("Game ended.");
 			document.querySelector('.game-screen-content')?.classList.add('hidden');
-			document.querySelector('.song-picker')?.classList.add('hidden');
+			document.querySelector('.song-picker')?.animate([{ transform: 'translateY(0%)' }, { transform: 'translateY(100%)'}], { duration: 500, easing: 'ease', fill: 'forwards' }).finished.then(() => {
+				document.querySelector('.song-picker')?.classList.add('hidden');
+				document.querySelector('.main-screen')?.animate([{ paddingLeft: '20%' }, { paddingLeft: '0%' }], { duration: 500, easing: 'ease', fill: 'forwards' });
+				document.querySelector(".sidebar")?.animate([{ transform: 'translateX(0%)' }, { transform: 'translateX(-100%)' }], { duration: 500, easing: 'ease', fill: 'forwards' }).finished.then(() => {
+					document.querySelector(".sidebar")?.classList.toggle("hidden");
+				});
+			});
 			document.querySelector('.game-summary')?.classList.remove('hidden');
-			document.querySelector('.sidebar')?.classList.add('hidden');
-			document.querySelector('footer')?.classList.remove('hidden');
 		});
 
 		socket.on('onRoundEnd', () => {
@@ -144,6 +150,8 @@ function App() {
 		document.querySelector(".start-screen-content")?.classList.toggle("hidden");
 		document.querySelector(".game-screen-content")?.classList.toggle("hidden");
 		document.querySelector(".sidebar")?.classList.toggle("hidden");
+		document.querySelector(".sidebar")?.animate([{transform: 'translateX(-100%)'}, {transform: 'translateX(0%)'}], { duration: 500, easing: 'ease', fill: 'forwards' });
+		document.querySelector('.main-screen')?.animate([{ paddingLeft: '0%' }, { paddingLeft: '20%' }], { duration: 500, easing: 'ease', fill: 'forwards' });
 	};
 
 	const switchOnLeaveUI = () => {
@@ -227,48 +235,46 @@ function App() {
 					/>
 				</div>
 			</div>
-			<div>
-				<div className="main-screen">
-					<h1>BARGEBO GUESSER</h1>
-					<div className='start-screen-content'>
-						<div className='start-screen-inputs'>
-							<label>Username:</label>
-							<input
-								placeholder="username"
-								name="usernameInput"
-								value={username}
-								onChange={(e) => setUsername(e.target.value)}
-								type="text"
-							/>
-							<label>Lobby Name:</label>
-							<input
-								placeholder="lobby name"
-								name="lobbyInput"
-								value={lobbyName}
-								onChange={(e) => setLobbyName(e.target.value)}
-								type="text"
-							/>
-						</div>
-						<div className='start-screen-buttons'>
-							<button type="submit" onClick={joinLobby}>Join Lobby</button>
-							<button type="submit" onClick={createLobby}>Create Lobby</button>
-						</div>
+			<div className="main-screen">
+				<h1>BARGEBO GUESSER</h1>
+				<div className='start-screen-content'>
+					<div className='start-screen-inputs'>
+						<label>Username:</label>
+						<input
+							placeholder="username"
+							name="usernameInput"
+							value={username}
+							onChange={(e) => setUsername(e.target.value)}
+							type="text"
+						/>
+						<label>Lobby Name:</label>
+						<input
+							placeholder="lobby name"
+							name="lobbyInput"
+							value={lobbyName}
+							onChange={(e) => setLobbyName(e.target.value)}
+							type="text"
+						/>
 					</div>
-					<div className='game-screen-content hidden'>
-						<h2 className='timer hidden'>Time: 0s</h2>
-						<div className='host-controls hidden'>
-							<div>
-								<label>Number of rounds:</label>
-								<input id='rounds' type="number" min={1} max={30} placeholder="Number of rounds" />
-								<p id='feedback' className='error'></p>
-								<button className='submitButton' type="submit" onClick={startGame}>Start</button>
-							</div>
-						</div>
+					<div className='start-screen-buttons'>
+						<button type="submit" onClick={joinLobby}>Join Lobby</button>
+						<button type="submit" onClick={createLobby}>Create Lobby</button>
 					</div>
-					<SongPicker songs={songs} onSongSelect={onSongSelection} />
-					<GameSummary players={lobbyPlayers} onLeaveLobby={onLeaveLobby} />
-					<footer>Borys Gajewki & Mateusz Antkiewicz @ 2025</footer>
 				</div>
+				<div className='game-screen-content hidden'>
+					<h2 className='timer hidden'>Time: 0s</h2>
+					<div className='host-controls hidden'>
+						<div>
+							<label>Number of rounds:</label>
+							<input id='rounds' type="number" min={1} max={30} placeholder="Number of rounds" />
+							<p id='feedback' className='error'></p>
+							<button className='submitButton' type="submit" onClick={startGame}>Start</button>
+						</div>
+					</div>
+				</div>
+				<SongPicker songs={songs} onSongSelect={onSongSelection} />
+				<GameSummary players={lobbyPlayers} onLeaveLobby={onLeaveLobby} />
+				<footer>Borys Gajewki & Mateusz Antkiewicz @ 2025</footer>
 			</div>
 		</div>
 	);

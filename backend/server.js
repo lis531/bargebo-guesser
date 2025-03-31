@@ -241,9 +241,19 @@ io.on('connection', (socket) => {
                         lobbies[lobbyName].firstAnswserPlayerId = socket.id;
                         player.score += 100;
                     }
-                    const baseScore = 500;
-                    const timeFactor = 1 - Number(lobbies[lobbyName].timePassed) / 20;
-                    player.score += Math.round(baseScore * timeFactor * 100) / 100;
+        
+                    const maxScore = 500;
+                    const minScore = 100;
+                    const timeLimit = 20;
+                    const timePassed = lobbies[lobbyName].timePassed;
+        
+                    if (timePassed <= 0.5) {
+                        player.score += maxScore;
+                    } else {
+                        const timeFactor = Math.exp(-2 * (timePassed / timeLimit));
+                        const score = minScore + (maxScore - minScore) * timeFactor;
+                        player.score += Math.round(score);
+                    }
                 }
                 io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
                 break;

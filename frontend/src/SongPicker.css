@@ -1,4 +1,6 @@
 .song-picker {
+    position: fixed;
+    bottom: 1rem;
     display: flex;
     align-items: center;
     justify-content: end;
@@ -13,14 +15,11 @@
 }
 
 .song-picker-songs {
-    width: inherit;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(18ch, 1fr));
-    grid-auto-rows: auto;
-    justify-items: center;
+    display: flex;
     gap: clamp(1rem, 3vw, 2rem);
     @media screen and (max-width: 1000px) {
-        grid-template-columns: 1fr 1fr;
+        display: grid;
+        grid: 1fr 1fr / 1fr 1fr;
         & > :nth-child(odd) {
             justify-self: end;
         }
