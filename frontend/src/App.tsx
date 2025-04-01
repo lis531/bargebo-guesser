@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import './App.css';
 import SongPicker from './SongPicker.tsx';
-import Leaderboard from './Leaderboard.tsx';
+import Sidebar from './Sidebar.tsx';
 import GameSummary from './GameSummary.tsx';
 import { io } from "socket.io-client";
 
@@ -15,7 +15,6 @@ function App() {
 	const [songs, setSongs] = useState<{ title: string; artist: string; cover: string; url: string; }[]>([]);
 	const [correctSongIndex, setCorrectSongIndex] = useState<number>();
 	
-	const initialVolume = Number(localStorage.getItem('volume')) || 50;
 	const audioContextRef = useRef<AudioContext | null>(null);
 	const gainNodeRef = useRef<GainNode | null>(null);
 	const sourceAudioBufferRef = useRef<AudioBufferSourceNode | null>(null);
@@ -115,9 +114,7 @@ function App() {
 			document.querySelector('.song-picker')?.animate([{ transform: 'translateY(0%)' }, { transform: 'translateY(100%)'}], { duration: 500, easing: 'ease', fill: 'forwards' }).finished.then(() => {
 				document.querySelector('.song-picker')?.classList.add('hidden');
 				document.querySelector('.main-screen')?.animate([{ paddingLeft: '20%' }, { paddingLeft: '0%' }], { duration: 500, easing: 'ease', fill: 'forwards' });
-				document.querySelector(".sidebar")?.animate([{ transform: 'translateX(0%)' }, { transform: 'translateX(-100%)' }], { duration: 500, easing: 'ease', fill: 'forwards' }).finished.then(() => {
-					document.querySelector(".sidebar")?.classList.toggle("hidden");
-				});
+				document.querySelector(".sidebar")?.animate([{ transform: 'translateX(0%)' }, { transform: 'translateX(-83%)' }], { duration: 500, easing: 'ease', fill: 'forwards' });
 			});
 			document.querySelector('.game-summary')?.classList.remove('hidden');
 		});
@@ -149,8 +146,7 @@ function App() {
 		console.log("Switching UI");
 		document.querySelector(".start-screen-content")?.classList.toggle("hidden");
 		document.querySelector(".game-screen-content")?.classList.toggle("hidden");
-		document.querySelector(".sidebar")?.classList.toggle("hidden");
-		document.querySelector(".sidebar")?.animate([{transform: 'translateX(-100%)'}, {transform: 'translateX(0%)'}], { duration: 500, easing: 'ease', fill: 'forwards' });
+		document.querySelector(".sidebar")?.animate([{transform: 'translateX(-83%)'}, {transform: 'translateX(0%)'}], { duration: 500, easing: 'ease', fill: 'forwards' });
 		document.querySelector('.main-screen')?.animate([{ paddingLeft: '0%' }, { paddingLeft: '20%' }], { duration: 500, easing: 'ease', fill: 'forwards' });
 	};
 
@@ -205,13 +201,6 @@ function App() {
 		});
 	};
 
-	const changeVolume = (volume: number) => {
-		localStorage.setItem('volume', volume.toString());
-		if (gainNodeRef.current) {
-			gainNodeRef.current.gain.value = volume / 200;
-		}
-	};
-
 	const onLeaveLobby = () => {
 		socket.emit('leaveLobby', lobbyName);
 		setLobbyPlayers([]);
@@ -220,21 +209,7 @@ function App() {
 
 	return (
 		<div className="main">
-			<div className='sidebar hidden'>
-				<Leaderboard players={lobbyPlayers} />
-				<div className='volume'>
-					<label htmlFor="volume">Volume</label>
-					<input
-						id="volume"
-						type='range'
-						defaultValue={initialVolume}
-						min={0}
-						max={100}
-						step={1}
-						onChange={(e) => changeVolume(parseInt(e.target.value))}
-					/>
-				</div>
-			</div>
+			<Sidebar players={lobbyPlayers} gainNodeRef={gainNodeRef} />
 			<div className="main-screen">
 				<h1>BARGEBO GUESSER</h1>
 				<div className='start-screen-content'>
