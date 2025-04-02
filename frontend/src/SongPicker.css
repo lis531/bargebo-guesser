@@ -8,7 +8,7 @@
     flex-direction: column;
     margin: 0 3vw;
     height: 45vh;
-    width: inherit;
+    width: -webkit-fill-available;
     @media screen and (max-width: 1000px) {
         height: 70vh;
     }
@@ -20,6 +20,7 @@
     @media screen and (max-width: 1000px) {
         display: grid;
         grid: 1fr 1fr / 1fr 1fr;
+        margin: 1rem 0;
         & > :nth-child(odd) {
             justify-self: end;
         }

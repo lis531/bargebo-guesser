@@ -130,9 +130,14 @@ dialog {
     --link-color: #747bff;
     --link-hover-color: #535bf2;
     --button-background-color: #f9f9f9;
-    --button-hover-color: #646cff;
-    --error-color: #e25d68;
-    --correct-color: #00ff00;
+}
+
+:root[data-theme='dark'] {
+    --background-color: #1b2027;
+    --text-color: rgba(255, 255, 255, 0.87);
+    --link-color: #646cff;
+    --link-hover-color: #535bf2;
+    --button-background-color: #1a1a1a;
 }
 
 @media (prefers-color-scheme: light) {
@@ -142,8 +147,5 @@ dialog {
         --link-color: #747bff;
         --link-hover-color: #535bf2;
         --button-background-color: #f9f9f9;
-        --button-hover-color: #646cff;
-        --error-color: #e25d68;
-        --correct-color: #00ff00;
     }
 }

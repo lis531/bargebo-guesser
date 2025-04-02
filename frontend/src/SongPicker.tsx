@@ -18,9 +18,9 @@ function SongPicker({ songs, onSongSelect }: Props) {
 
         confetti({
             particleCount: 100,
-            spread: 70,
+            spread: 90,
             origin: { x: x / window.innerWidth, y: y / window.innerHeight },
-            colors: ['#ff0', '#0f0', '#00f'],
+            colors: ['#FF5733', '#33FF57', '#3357FF', '#FF33A1', '#A133FF', '#FFD700'],
         });
     };
 
@@ -31,7 +31,7 @@ function SongPicker({ songs, onSongSelect }: Props) {
                 tile.classList.add("selected");
                 onSongSelect(index);
 
-                if (tile.classList.contains("correct")) {
+                if (tile.classList.contains("correct") && localStorage.getItem("specialEffects") !== "false") {
                     triggerConfetti(tile);
                 }
             }

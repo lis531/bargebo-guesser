@@ -14,7 +14,7 @@ function App() {
 	const [lobbyPlayers, setLobbyPlayers] = useState<any[]>([]);
 	const [songs, setSongs] = useState<{ title: string; artist: string; cover: string; url: string; }[]>([]);
 	const [correctSongIndex, setCorrectSongIndex] = useState<number>();
-	
+
 	const audioContextRef = useRef<AudioContext | null>(null);
 	const gainNodeRef = useRef<GainNode | null>(null);
 	const sourceAudioBufferRef = useRef<AudioBufferSourceNode | null>(null);
@@ -91,7 +91,7 @@ function App() {
 			document.querySelector('.timer')?.classList.remove('invisible');
 			if (document.querySelector('.song-picker')?.classList.contains('invisible')) {
 				document.querySelector('.song-picker')?.classList.remove('invisible');
-				document.querySelector('.song-picker')?.animate([{ transform: 'translateY(100%)' }, { transform: 'translateY(0%)'}], { duration: 500, easing: 'ease', fill: 'forwards' });
+				document.querySelector('.song-picker')?.animate([{ transform: 'translateY(100%)' }, { transform: 'translateY(0%)' }], { duration: 500, easing: 'ease', fill: 'forwards' });
 			}
 
 			audioContextRef.current!.decodeAudioData(correctSongData, (buffer) => {
@@ -111,10 +111,12 @@ function App() {
 			}
 			console.log("Game ended.");
 			document.querySelector('.game-screen-content')?.classList.add('hidden');
-			document.querySelector('.song-picker')?.animate([{ transform: 'translateY(0%)' }, { transform: 'translateY(100%)'}], { duration: 500, easing: 'ease', fill: 'forwards' }).finished.then(() => {
+			document.querySelector('.song-picker')?.animate([{ transform: 'translateY(0%)' }, { transform: 'translateY(100%)' }], { duration: 500, easing: 'ease', fill: 'forwards' }).finished.then(() => {
+				// get innerwidth of the sidebar
+				const sidebarWidth = document.querySelector('.sidebar')?.getBoundingClientRect().width;
 				document.querySelector('.song-picker')?.classList.add('hidden');
-				document.querySelector('.main-screen')?.animate([{ paddingLeft: '20%' }, { paddingLeft: '0%' }], { duration: 500, easing: 'ease', fill: 'forwards' });
-				document.querySelector(".sidebar")?.animate([{ transform: 'translateX(0%)' }, { transform: 'translateX(-83%)' }], { duration: 500, easing: 'ease', fill: 'forwards' });
+				document.querySelector('.main-screen')?.animate([{ paddingLeft: `${sidebarWidth}px` }, { paddingLeft: '0%' }], { duration: 500, easing: 'ease', fill: 'forwards' });
+				document.querySelector(".sidebar")?.animate([{ transform: 'translateX(0%)' }, { transform: 'translateX(calc(-100% + 66px))' }], { duration: 500, easing: 'ease', fill: 'forwards' });
 			});
 			document.querySelector('.game-summary')?.classList.remove('hidden');
 		});
@@ -144,10 +146,11 @@ function App() {
 
 	const switchGameUI = () => {
 		console.log("Switching UI");
+		const sidebarWidth = document.querySelector('.sidebar')?.getBoundingClientRect().width;
 		document.querySelector(".start-screen-content")?.classList.toggle("hidden");
 		document.querySelector(".game-screen-content")?.classList.toggle("hidden");
-		document.querySelector(".sidebar")?.animate([{transform: 'translateX(-83%)'}, {transform: 'translateX(0%)'}], { duration: 500, easing: 'ease', fill: 'forwards' });
-		document.querySelector('.main-screen')?.animate([{ paddingLeft: '0%' }, { paddingLeft: '20%' }], { duration: 500, easing: 'ease', fill: 'forwards' });
+		document.querySelector(".sidebar")?.animate([{ transform: 'translateX(calc(-100% + 66px))' }, { transform: 'translateX(0%)' }], { duration: 500, easing: 'ease', fill: 'forwards' });
+		document.querySelector('.main-screen')?.animate([{ paddingLeft: '0%' }, { paddingLeft: `${sidebarWidth}px` }], { duration: 500, easing: 'ease', fill: 'forwards' });
 	};
 
 	const switchOnLeaveUI = () => {
