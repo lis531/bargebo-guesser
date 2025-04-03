@@ -105,7 +105,7 @@ async function announceRoundStart(lobbyName) {
     lobbies[lobbyName].players.forEach(player => player.choice = -1);
     lobbies[lobbyName].roundStarted = true;
     lobbies[lobbyName].currentRound += 1;
-    lobbies[lobbyName].firstAnswserPlayerId = '';
+    lobbies[lobbyName].firstAnswerPlayerId = '';
 
     console.log("Selecting tracks...");
     const selectedTracks = [];
@@ -166,7 +166,6 @@ async function announceRoundEnd(lobbyName) {
     } else {
         console.log("Game ended.");
         io.to(lobbyName).emit('onGameEnd');
-        delete lobbies[lobbyName];
     }
 }
 
@@ -181,7 +180,7 @@ io.on('connection', (socket) => {
         }
 
         lobbies[lobbyName] = {
-            players: [{ id: socket.id, username: username, choice: -1, score: 0 }],
+            players: [{ id: socket.id, username: username, choice: -1, score: 0, isHost: true }],
             roundStarted: false,
             currentRound: 0,
             rounds: 0
@@ -200,12 +199,12 @@ io.on('connection', (socket) => {
         }
 
         for (const player of lobbies[lobbyName].players) {
-            if (player.name === username) {
-                socket.emit('joinLobbyResponse', 'Player with this name already is in the lobby!');
+            if (player.username === username) {
+                socket.emit('joinLobbyResponse', 'Player with this name is in the lobby!');
                 return;
             }
             if (player.id === socket.id) {
-                socket.emit('joinLobbyResponse', 'This client is already connected to the lobby!');
+                socket.emit('joinLobbyResponse', 'This client is connected to the lobby!');
                 return;
             }
         }
@@ -219,7 +218,19 @@ io.on('connection', (socket) => {
 
     socket.on('announceGameStart', async (lobbyName, rounds) => {
         if (!lobbies[lobbyName]) return;
+        if (lobbies[lobbyName].players.id == socket.id && !lobbies[lobbyName].players.isHost) return;
         lobbies[lobbyName].rounds = rounds;
+        lobbies[lobbyName].roundStarted = false;
+        lobbies[lobbyName].currentRound = 0;
+        lobbies[lobbyName].firstAnswserPlayerId = '';
+        lobbies[lobbyName].timePassed = 0;
+        lobbies[lobbyName].timeInterval = null;
+        for (const player of lobbies[lobbyName].players) {
+            player.score = 0;
+            console.log(player.username + " score: " + player.score);
+            player.choice = -1;
+        }
+        io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
         io.to(lobbyName).emit('onGameStart');
     });
 
@@ -237,8 +248,8 @@ io.on('connection', (socket) => {
             if (player.id === socket.id) {
                 player.choice = choiceIndex;
                 if (choiceIndex == lobbies[lobbyName].correctIndex) {
-                    if (lobbies[lobbyName].firstAnswserPlayerId === '') {
-                        lobbies[lobbyName].firstAnswserPlayerId = socket.id;
+                    if (lobbies[lobbyName].firstAnswerPlayerId === '') {
+                        lobbies[lobbyName].firstAnswerPlayerId = socket.id;
                         player.score += 100;
                     }
         
@@ -283,6 +294,18 @@ io.on('connection', (socket) => {
             }
         }
     });
+
+    socket.on('leaveLobby', (lobbyName) => {
+        if (!lobbies[lobbyName]) return;
+        lobbies[lobbyName].players = lobbies[lobbyName].players.filter(p => p.id !== socket.id);
+        socket.leave(lobbyName);
+        io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
+        if (lobbies[lobbyName].players.length === 0) {
+            delete lobbies[lobbyName];
+            io.emit('onLobbyListChanged', Object.keys(lobbies));
+        }
+    });
+
 });
 
 server.listen(PORT, () => {

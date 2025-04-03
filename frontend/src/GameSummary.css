@@ -3,6 +3,14 @@
     flex-direction: column;
     justify-content: flex-end;
     height: 30vh;
+    & > div:last-of-type {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        button {
+            width: 161px;
+        }
+    }
 }
 
 .game-summary-player {

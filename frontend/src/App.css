@@ -34,12 +34,12 @@
 			height: 20vh;
 		}
 		@media screen and (max-width: 450px) {
-			font-size: 3.5em;
+			font-size: 3.5rem;
 		}
 	}
 
 	label {
-		text-indent: 0.3em;
+		text-indent: 0.3rem;
 		margin-bottom: 0.1em;
 		font-size: large;
 	}
@@ -48,17 +48,16 @@
 		display: flex;
 		flex-direction: column;
 		justify-content: end;
-		gap: 1em;
 		height: 30vh;
 		@media screen and (max-width: 1000px) {
-			height: 35vh;
+			height: 44vh;
 		}
 	}
 
 	.start-screen-inputs {
 		display: flex;
 		flex-direction: column;
-		& > input {
+		& > input:first-of-type {
 			margin-bottom: 1em;
 		}
 	}
@@ -66,6 +65,9 @@
 	.start-screen-buttons {
 		display: flex;
 		gap: 1em;
+		& > button {
+			width: 147px;
+		}
 	}
 
 	.game-screen-content {
@@ -82,9 +84,8 @@
 			justify-content: center;
 		}
 		@media screen and (max-width: 1000px) {
-			height: 35vh;
 			&:has(.timer:not(.invisible)) {
-				height: 10vh;
+				height: 44vh;
 			}
 		}
 	}
@@ -95,7 +96,7 @@
 		flex-direction: column;
 		justify-content: end;
 		@media screen and (max-width: 1000px) {
-			height: 70vh;
+			height: 36vh;
 		}
 	}
 
@@ -105,6 +106,7 @@
 		margin: 0 0 0.5em 0;
 		@media screen and (max-width: 450px) {
 			justify-content: center;
+			margin: 0 0 1em 0;
 		}
 	}
 }

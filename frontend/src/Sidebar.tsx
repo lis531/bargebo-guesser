@@ -12,7 +12,7 @@ interface Props {
     ref: React.RefObject<HTMLDivElement | null>;
 }
 
-function Sidebar(props: { players: Player[]} & Props) {
+function Sidebar(props: { players: Player[] } & Props) {
     const gainNodeRef = props.gainNodeRef;
     const sidebarRef = props.ref;
     const { players } = props;
@@ -25,6 +25,16 @@ function Sidebar(props: { players: Player[]} & Props) {
         const dialog = document.querySelector('.settings-dialog') as HTMLDialogElement;
         if (dialog) {
             dialog.showModal();
+            dialog.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: 'ease-in-out', fill: 'forwards' });
+        }
+    };
+
+    const closeSettingsView = (e: React.MouseEvent) => {
+        const dialog = document.querySelector('.settings-dialog') as HTMLDialogElement;
+        if (dialog && e.target === dialog) {
+            dialog.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: 'ease-in-out', fill: 'forwards' }).finished.then(() => {
+                dialog.close();
+            });
         }
     };
 
@@ -47,11 +57,11 @@ function Sidebar(props: { players: Player[]} & Props) {
 
     return (
         <>
-            <dialog className='settings-dialog' onClick={(e) => { if (e.target === e.currentTarget) { (e.currentTarget as HTMLDialogElement).close() } }}>
+            <dialog className='settings-dialog' onClick={(e) => closeSettingsView(e)}>
                 <div className='settings-dialog-content'>
                     <h2>Settings</h2>
                     <label htmlFor="specialEffects">Special effects</label>
-                    <input type="checkbox" id="specialEffects" name="specialEffects" value="specialEffects" onChange={(e) => localStorage.setItem('specialEffects', JSON.stringify(e.target.checked))} defaultChecked/>
+                    <input type="checkbox" id="specialEffects" name="specialEffects" value="specialEffects" onChange={(e) => localStorage.setItem('specialEffects', JSON.stringify(e.target.checked))} defaultChecked />
                     <br />
                     <label htmlFor="darkMode">Theme: </label>
                     <select id="theme" name="theme" value={theme} onChange={(e) => handleThemeChange(e.target.value)}>
