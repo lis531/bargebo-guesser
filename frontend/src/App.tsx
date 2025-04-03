@@ -50,12 +50,11 @@ function App() {
 
 		socket.on('onPlayersChanged', (players) => {
 			setLobbyPlayers(players);
-			console.log("Players changed: ", players);
 		});
 
 		socket.on("createLobbyResponse", (lobbyName, err) => {
 			if (err !== '') {
-				console.log("Error while creating a lobby: ", err);
+				document.getElementById('ssfeedback')!.innerHTML = err;
 				return;
 			}
 			switchGameUI();
@@ -66,7 +65,7 @@ function App() {
 
 		socket.on("joinLobbyResponse", (err) => {
 			if (err !== '') {
-				console.log("Error while joining a lobby: ", err);
+				document.getElementById('ssfeedback')!.innerHTML = err;
 				return;
 			}
 			switchGameUI();
@@ -175,16 +174,20 @@ function App() {
 	};
 
 	const startGame = () => {
-		const rounds = parseInt((document.getElementById('rounds') as HTMLInputElement).value);
-		const feedbackElement = document.getElementById('feedback') as HTMLElement;
-		if (rounds < 1 || rounds > 30 || isNaN(rounds)) {
-			feedbackElement.innerHTML = "Invalid number of rounds.";
-			return;
+		const feedbackElement = document.getElementById('gsfeedback') as HTMLElement;
+		if (lobbyPlayers.some(player => player.username === username && player.isHost)) {
+			const rounds = parseInt((document.getElementById('rounds') as HTMLInputElement).value);
+			if (rounds < 1 || rounds > 30 || isNaN(rounds)) {
+				feedbackElement.innerHTML = "Invalid number of rounds. (1-30)";
+				return;
+			} else {
+				feedbackElement.innerHTML = "";
+			}
+			socket.emit('announceGameStart', lobbyName, rounds);
+			socket.emit('announceRoundStart', lobbyName);
 		} else {
-			feedbackElement.innerHTML = "";
+			feedbackElement.innerHTML = "You are not the host.";
 		}
-		socket.emit('announceGameStart', lobbyName, rounds);
-		socket.emit('announceRoundStart', lobbyName);
 	};
 
 	const submitAnswer = (choiceIndex: number) => {
@@ -214,9 +217,20 @@ function App() {
 		switchOnLeaveUI();
 	};
 
+	const onLobbyReturn = () => {
+		gameSummaryRef.current?.classList.add('hidden');
+		startScreenContentRef.current?.classList.remove("hidden");
+		if (lobbyPlayers.some(player => player.username === username && player.isHost)) {
+			hostControlsRef.current?.classList.remove("invisible");
+			timerRef.current?.classList.add('invisible');
+			songPickerRef.current?.classList.add('invisible');
+		}
+		switchGameUI();
+	};
+
 	return (
 		<div className="main">
-			<Sidebar players={lobbyPlayers} gainNodeRef={gainNodeRef} ref={sidebarRef}/>
+			<Sidebar players={lobbyPlayers} gainNodeRef={gainNodeRef} ref={sidebarRef} />
 			<div className="main-screen" ref={mainScreenRef}>
 				<h1>BARGEBO GUESSER</h1>
 				<div className='start-screen-content' ref={startScreenContentRef}>
@@ -237,6 +251,7 @@ function App() {
 							onChange={(e) => setLobbyName(e.target.value)}
 							type="text"
 						/>
+						<p id='ssfeedback' className='error'></p>
 					</div>
 					<div className='start-screen-buttons'>
 						<button type="submit" onClick={joinLobby}>Join Lobby</button>
@@ -249,13 +264,13 @@ function App() {
 						<div>
 							<label>Number of rounds:</label>
 							<input id='rounds' type="number" min={1} max={30} placeholder="Number of rounds" />
-							<p id='feedback' className='error'></p>
+							<p id='gsfeedback' className='error'></p>
 							<button className='submitButton' type="submit" onClick={startGame}>Start</button>
 						</div>
 					</div>
 				</div>
 				<SongPicker songs={songs} onSongSelect={onSongSelection} ref={songPickerRef} />
-				<GameSummary players={lobbyPlayers} onLeaveLobby={onLeaveLobby} ref={gameSummaryRef} />
+				<GameSummary players={lobbyPlayers} onLeaveLobby={onLeaveLobby} onLobbyReturn={onLobbyReturn} ref={gameSummaryRef} />
 				<footer>Borys Gajewki & Mateusz Antkiewicz @ 2025</footer>
 			</div>
 		</div>

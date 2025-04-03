@@ -6,12 +6,17 @@ interface Props {
         score: number;
     }[];
     onLeaveLobby: () => void;
+    onLobbyReturn: () => void;
     ref: React.RefObject<HTMLDivElement | null>;
 }
 
-function GameSummary({ players, onLeaveLobby, ref }: Props) {
+function GameSummary({ players, onLeaveLobby, onLobbyReturn, ref }: Props) {
     const leaveLobby = () => {
         onLeaveLobby();
+    }
+
+    const returnToLobby = () => {
+        onLobbyReturn();
     }
 
     return (
@@ -28,6 +33,7 @@ function GameSummary({ players, onLeaveLobby, ref }: Props) {
             <div>
                 {/* <button className="hidden">Play Again</button> */}
                 <button onClick={() => leaveLobby()}>Leave</button>
+                <button onClick={() => returnToLobby()}>Return to lobby</button>
             </div>
         </div>
     )
