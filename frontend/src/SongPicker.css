@@ -1,16 +1,18 @@
 .song-picker {
     position: fixed;
-    bottom: 1rem;
+    bottom: 3rem;
     display: flex;
     align-items: center;
     justify-content: end;
-    padding-bottom: 1rem;
     flex-direction: column;
     margin: 0 3vw;
-    height: 45vh;
+    max-height: 45vh;
     width: -webkit-fill-available;
     @media screen and (max-width: 1000px) {
-        height: 70vh;
+        max-height: 70vh;
+        & > h2 {
+            margin: 0;
+        }
     }
 }
 

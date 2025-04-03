@@ -8,9 +8,10 @@ interface Props {
         cover: string;
     }[];
     onSongSelect: (index: number) => void;
+    ref: React.RefObject<HTMLDivElement | null>;
 }
 
-function SongPicker({ songs, onSongSelect }: Props) {
+function SongPicker({ songs, onSongSelect, ref }: Props) {
     const triggerConfetti = (tile: HTMLElement) => {
         const rect = tile.getBoundingClientRect();
         const x = rect.left + rect.width / 2;
@@ -41,7 +42,7 @@ function SongPicker({ songs, onSongSelect }: Props) {
     };
 
     return (
-        <div className="song-picker hidden">
+        <div className="song-picker hidden" ref={ref}>
             <h2>Choose a song</h2>
             <div className="song-picker-songs">
                 {songs.map((song, index) => (

@@ -23,6 +23,12 @@
         display: flex;
         padding: 4px;
         box-shadow: 0 0 3px 1px rgba(0, 0, 0, 0.5);
+        & > svg {
+            transition: rotate 0.3s ease-in-out;
+        }
+        &:hover > svg {
+            rotate: 90deg;
+        }
     }
     .volume {
 		display: flex;

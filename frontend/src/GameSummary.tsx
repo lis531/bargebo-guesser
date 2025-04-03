@@ -6,15 +6,16 @@ interface Props {
         score: number;
     }[];
     onLeaveLobby: () => void;
+    ref: React.RefObject<HTMLDivElement | null>;
 }
 
-function GameSummary({ players, onLeaveLobby }: Props) {
+function GameSummary({ players, onLeaveLobby, ref }: Props) {
     const leaveLobby = () => {
         onLeaveLobby();
     }
 
     return (
-        <div className="hidden game-summary">
+        <div className="hidden game-summary" ref={ref}>
             <h2>Game Summary</h2>
             <div className="game-summary-players">
                 {players.map((player, index) => (

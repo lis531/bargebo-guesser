@@ -7,12 +7,14 @@ interface Player {
     score: number;
 }
 
-interface GainNodeRef {
-    current: GainNode | null;
+interface Props {
+    gainNodeRef: React.RefObject<GainNode | null>;
+    ref: React.RefObject<HTMLDivElement | null>;
 }
 
-function Sidebar(props: { players: Player[], gainNodeRef: GainNodeRef }) {
+function Sidebar(props: { players: Player[]} & Props) {
     const gainNodeRef = props.gainNodeRef;
+    const sidebarRef = props.ref;
     const { players } = props;
 
     const initialVolume = Number(localStorage.getItem('volume')) || 50;
@@ -59,7 +61,7 @@ function Sidebar(props: { players: Player[], gainNodeRef: GainNodeRef }) {
                     </select>
                 </div>
             </dialog>
-            <div className="sidebar">
+            <div className="sidebar" ref={sidebarRef}>
                 <div className="leaderboard">
                     <h2>Leaderboard</h2>
                     <h3 id="roundNumber">Round: </h3>

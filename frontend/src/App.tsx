@@ -19,6 +19,15 @@ function App() {
 	const gainNodeRef = useRef<GainNode | null>(null);
 	const sourceAudioBufferRef = useRef<AudioBufferSourceNode | null>(null);
 
+	const timerRef = useRef<HTMLHeadingElement>(null);
+	const hostControlsRef = useRef<HTMLDivElement>(null);
+	const songPickerRef = useRef<HTMLDivElement>(null);
+	const gameScreenContentRef = useRef<HTMLDivElement>(null);
+	const startScreenContentRef = useRef<HTMLDivElement>(null);
+	const mainScreenRef = useRef<HTMLDivElement>(null);
+	const sidebarRef = useRef<HTMLDivElement>(null);
+	const gameSummaryRef = useRef<HTMLDivElement>(null);
+
 	useEffect(() => {
 		audioContextRef.current = new AudioContext();
 		gainNodeRef.current = audioContextRef.current.createGain();
@@ -26,19 +35,17 @@ function App() {
 		gainNodeRef.current.connect(audioContextRef.current.destination);
 
 		const handleLobbyListChange = (lobbyNames: any[]) => {
-			console.log("Lobby names changed: ", lobbyNames);
+
 		};
 
 		const handlePlayersChange = (players: any[]) => {
 			setLobbyPlayers(players);
-			console.log("Players changed: ", players);
 		};
 
 		socket.on('onLobbyListChanged', handleLobbyListChange);
 		socket.on('onPlayersChanged', handlePlayersChange);
 
 		socket.on('onLobbyListChanged', (lobbyNames) => {
-			console.log("Lobby names changed: ", lobbyNames);
 		});
 
 		socket.on('onPlayersChanged', (players) => {
@@ -52,10 +59,9 @@ function App() {
 				return;
 			}
 			switchGameUI();
-			document.querySelector(".host-controls")?.classList.remove("hidden");
-			document.querySelector('.timer')?.classList.add('invisible');
-			document.querySelector('.song-picker')?.classList.add('invisible');
-			console.log("Successfully created a lobby called: ", lobbyName);
+			hostControlsRef.current?.classList.remove("invisible");
+			timerRef.current?.classList.add('invisible');
+			songPickerRef.current?.classList.add('invisible');
 		});
 
 		socket.on("joinLobbyResponse", (err) => {
@@ -64,15 +70,14 @@ function App() {
 				return;
 			}
 			switchGameUI();
-			document.querySelector('.timer')?.classList.add('hidden');
-			document.querySelector('.song-picker')?.classList.add('hidden');
-			console.log("Successfully joined a lobby called: ", lobbyName);
+			timerRef.current?.classList.add('hidden');
+			songPickerRef.current?.classList.add('hidden');
 		});
 
 		socket.on('onGameStart', () => {
-			document.querySelector('.host-controls')?.classList.add('hidden');
-			document.querySelector('.timer')?.classList.remove('hidden');
-			document.querySelector('.song-picker')?.classList.remove('hidden');
+			hostControlsRef.current?.classList.add('invisible');
+			timerRef.current?.classList.remove('hidden');
+			songPickerRef.current?.classList.remove('hidden');
 		});
 
 		socket.on('onRoundStart', async (allSongs, correctIndex, correctSongData, currentRounds, rounds) => {
@@ -88,10 +93,10 @@ function App() {
 			const roundNumber = document.getElementById('roundNumber') as HTMLElement;
 			roundNumber.innerHTML = `Round: ${currentRounds} / ${rounds}`;
 
-			document.querySelector('.timer')?.classList.remove('invisible');
-			if (document.querySelector('.song-picker')?.classList.contains('invisible')) {
-				document.querySelector('.song-picker')?.classList.remove('invisible');
-				document.querySelector('.song-picker')?.animate([{ transform: 'translateY(100%)' }, { transform: 'translateY(0%)' }], { duration: 500, easing: 'ease', fill: 'forwards' });
+			timerRef.current?.classList.remove('invisible');
+			if (songPickerRef.current?.classList.contains('invisible')) {
+				songPickerRef.current?.classList.remove('invisible');
+				songPickerRef.current?.animate([{ transform: 'translateY(100%)', opacity: 0 }, { transform: 'translateY(0%)', opacity: 1 }], { duration: 500, easing: 'ease', fill: 'forwards' });
 			}
 
 			audioContextRef.current!.decodeAudioData(correctSongData, (buffer) => {
@@ -109,16 +114,15 @@ function App() {
 				sourceAudioBufferRef.current.stop();
 				sourceAudioBufferRef.current = null;
 			}
-			console.log("Game ended.");
-			document.querySelector('.game-screen-content')?.classList.add('hidden');
-			document.querySelector('.song-picker')?.animate([{ transform: 'translateY(0%)' }, { transform: 'translateY(100%)' }], { duration: 500, easing: 'ease', fill: 'forwards' }).finished.then(() => {
-				// get innerwidth of the sidebar
-				const sidebarWidth = document.querySelector('.sidebar')?.getBoundingClientRect().width;
-				document.querySelector('.song-picker')?.classList.add('hidden');
-				document.querySelector('.main-screen')?.animate([{ paddingLeft: `${sidebarWidth}px` }, { paddingLeft: '0%' }], { duration: 500, easing: 'ease', fill: 'forwards' });
-				document.querySelector(".sidebar")?.animate([{ transform: 'translateX(0%)' }, { transform: 'translateX(calc(-100% + 66px))' }], { duration: 500, easing: 'ease', fill: 'forwards' });
+			gameScreenContentRef.current?.classList.add('hidden');
+			songPickerRef.current?.animate([{ transform: 'translateY(0%)', opacity: 1 }, { transform: 'translateY(100%)', opacity: 0 }], { duration: 500, easing: 'ease', fill: 'forwards' }).finished.then(() => {
+				const sidebarWidth = sidebarRef.current?.getBoundingClientRect().width;
+				songPickerRef.current?.classList.add('hidden');
+				mainScreenRef.current?.animate([{ paddingLeft: `${sidebarWidth}px` }, { paddingLeft: '0%' }], { duration: 500, easing: 'ease', fill: 'forwards' });
+				sidebarRef.current?.animate([{ transform: 'translateX(0%)' }, { transform: 'translateX(calc(-100% + 66px))' }], { duration: 500, easing: 'ease', fill: 'forwards' });
+				sidebarRef.current?.children[0].animate([{ opacity: 1 }, { opacity: 0 }], { duration: 500, easing: 'ease', fill: 'forwards' });
 			});
-			document.querySelector('.game-summary')?.classList.remove('hidden');
+			gameSummaryRef.current?.classList.remove('hidden');
 		});
 
 		socket.on('onRoundEnd', () => {
@@ -127,17 +131,17 @@ function App() {
 				sourceAudioBufferRef.current = null;
 			}
 			socket.emit('announceRoundStart', lobbyName);
-			console.log("Ending round.");
 		});
 
 		socket.on('timerChange', (timePassed) => {
-			const timerElement = document.querySelector('.timer') as HTMLElement;
-			timerElement!.innerHTML = `Time: ${Math.floor(timePassed)}.<small>${timePassed.toString().split('.')[1]}</small>s`
+			if (timerRef.current) {
+				timerRef.current.innerHTML = `Time: ${Math.floor(timePassed)}.<small>${timePassed.toString().split('.')[1]}</small>s`;
+			}
 		});
 
 		return () => {
-			socket.off('onLobbyListChanged', handleLobbyListChange);
-			socket.off('onPlayersChanged', handlePlayersChange);
+			socket.off('onLobbyListChanged');
+			socket.off('onPlayersChanged');
 			if (audioContextRef.current) {
 				audioContextRef.current.close();
 			}
@@ -145,17 +149,17 @@ function App() {
 	}, []);
 
 	const switchGameUI = () => {
-		console.log("Switching UI");
-		const sidebarWidth = document.querySelector('.sidebar')?.getBoundingClientRect().width;
-		document.querySelector(".start-screen-content")?.classList.toggle("hidden");
-		document.querySelector(".game-screen-content")?.classList.toggle("hidden");
-		document.querySelector(".sidebar")?.animate([{ transform: 'translateX(calc(-100% + 66px))' }, { transform: 'translateX(0%)' }], { duration: 500, easing: 'ease', fill: 'forwards' });
-		document.querySelector('.main-screen')?.animate([{ paddingLeft: '0%' }, { paddingLeft: `${sidebarWidth}px` }], { duration: 500, easing: 'ease', fill: 'forwards' });
+		const sidebarWidth = sidebarRef.current?.getBoundingClientRect().width;
+		startScreenContentRef.current?.classList.toggle("hidden");
+		gameScreenContentRef.current?.classList.toggle("hidden");
+		sidebarRef.current?.animate([{ transform: 'translateX(calc(-100% + 66px))' }, { transform: 'translateX(0%)' }], { duration: 500, easing: 'ease', fill: 'forwards' });
+		sidebarRef.current?.children[0].animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500, easing: 'ease', fill: 'forwards' });
+		mainScreenRef.current?.animate([{ paddingLeft: '0%' }, { paddingLeft: `${sidebarWidth}px` }], { duration: 500, easing: 'ease', fill: 'forwards' });
 	};
 
 	const switchOnLeaveUI = () => {
-		document.querySelector(".game-summary")?.classList.toggle("hidden");
-		document.querySelector(".start-screen-content")?.classList.toggle("hidden");
+		gameSummaryRef.current?.classList.toggle("hidden");
+		startScreenContentRef.current?.classList.toggle("hidden");
 	};
 
 	const createLobby = () => {
@@ -212,10 +216,10 @@ function App() {
 
 	return (
 		<div className="main">
-			<Sidebar players={lobbyPlayers} gainNodeRef={gainNodeRef} />
-			<div className="main-screen">
+			<Sidebar players={lobbyPlayers} gainNodeRef={gainNodeRef} ref={sidebarRef}/>
+			<div className="main-screen" ref={mainScreenRef}>
 				<h1>BARGEBO GUESSER</h1>
-				<div className='start-screen-content'>
+				<div className='start-screen-content' ref={startScreenContentRef}>
 					<div className='start-screen-inputs'>
 						<label>Username:</label>
 						<input
@@ -239,9 +243,9 @@ function App() {
 						<button type="submit" onClick={createLobby}>Create Lobby</button>
 					</div>
 				</div>
-				<div className='game-screen-content hidden'>
-					<h2 className='timer hidden'>Time: 0s</h2>
-					<div className='host-controls hidden'>
+				<div className='game-screen-content hidden' ref={gameScreenContentRef}>
+					<h2 className='timer hidden' ref={timerRef}>Time: 0s</h2>
+					<div className='host-controls invisible' ref={hostControlsRef}>
 						<div>
 							<label>Number of rounds:</label>
 							<input id='rounds' type="number" min={1} max={30} placeholder="Number of rounds" />
@@ -250,8 +254,8 @@ function App() {
 						</div>
 					</div>
 				</div>
-				<SongPicker songs={songs} onSongSelect={onSongSelection} />
-				<GameSummary players={lobbyPlayers} onLeaveLobby={onLeaveLobby} />
+				<SongPicker songs={songs} onSongSelect={onSongSelection} ref={songPickerRef} />
+				<GameSummary players={lobbyPlayers} onLeaveLobby={onLeaveLobby} ref={gameSummaryRef} />
 				<footer>Borys Gajewki & Mateusz Antkiewicz @ 2025</footer>
 			</div>
 		</div>
