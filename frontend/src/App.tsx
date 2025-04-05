@@ -9,9 +9,27 @@ import { io } from "socket.io-client";
 const socket = io("https://bargebo-00fc4919d1db.herokuapp.com/");
 
 function App() {
+	type Player = {
+		id: string;
+		username: string;
+		choice: number;
+		score: number;
+		isHost?: boolean;
+	};
+
+	type Lobby = {
+		players: Player[];
+		roundStarted: boolean;
+		currentRound: number;
+		rounds: number;
+	};
+
+	type LobbyMap = Record<string, Lobby>;
+
 	const [lobbyName, setLobbyName] = useState<string>("");
 	const [username, setUsername] = useState<string>("");
 	const [lobbyPlayers, setLobbyPlayers] = useState<any[]>([]);
+	const [lobbyList, setLobbyList] = useState<LobbyMap>({});
 	const [songs, setSongs] = useState<{ title: string; artist: string; cover: string; url: string; }[]>([]);
 	const [correctSongIndex, setCorrectSongIndex] = useState<number>();
 
@@ -24,9 +42,14 @@ function App() {
 	const songPickerRef = useRef<HTMLDivElement>(null);
 	const gameScreenContentRef = useRef<HTMLDivElement>(null);
 	const startScreenContentRef = useRef<HTMLDivElement>(null);
+	const lobbiesListRef = useRef<HTMLDivElement>(null);
 	const mainScreenRef = useRef<HTMLDivElement>(null);
 	const sidebarRef = useRef<HTMLDivElement>(null);
 	const gameSummaryRef = useRef<HTMLDivElement>(null);
+	const ssfeedbackRef = useRef<HTMLParagraphElement>(null);
+	const gsfeedbackRef = useRef<HTMLParagraphElement>(null);
+
+	const [isDevMode, _] = useState<boolean>(localStorage.getItem('devMode') === 'true');
 
 	useEffect(() => {
 		audioContextRef.current = new AudioContext();
@@ -34,9 +57,9 @@ function App() {
 		gainNodeRef.current.gain.value = 0.25;
 		gainNodeRef.current.connect(audioContextRef.current.destination);
 
-		const handleLobbyListChange = (_lobbyNames: any[]) => {
-			
-		};
+		const handleLobbyListChange = (lobbies: LobbyMap) => {
+			setLobbyList(lobbies);
+		}
 
 		const handlePlayersChange = (players: any[]) => {
 			setLobbyPlayers(players);
@@ -49,9 +72,9 @@ function App() {
 			setLobbyPlayers(players);
 		});
 
-		socket.on("createLobbyResponse", (_lobbyName, err) => {
+		socket.on("createLobbyResponse", (_, err) => {
 			if (err !== '') {
-				document.getElementById('ssfeedback')!.innerHTML = err;
+				ssfeedbackRef.current!.innerText = err;
 				return;
 			}
 			switchGameUI();
@@ -62,7 +85,7 @@ function App() {
 
 		socket.on("joinLobbyResponse", (err) => {
 			if (err !== '') {
-				document.getElementById('ssfeedback')!.innerHTML = err;
+				ssfeedbackRef.current!.innerText = err;
 				return;
 			}
 			switchGameUI();
@@ -147,6 +170,7 @@ function App() {
 	const switchGameUI = () => {
 		const sidebarWidth = sidebarRef.current?.getBoundingClientRect().width;
 		startScreenContentRef.current?.classList.toggle("hidden");
+		lobbiesListRef.current?.classList.toggle("hidden");
 		gameScreenContentRef.current?.classList.toggle("hidden");
 		sidebarRef.current?.animate([{ transform: 'translateX(calc(-100% + 66px))' }, { transform: 'translateX(0%)' }], { duration: 500, easing: 'ease', fill: 'forwards' });
 		sidebarRef.current?.children[0].animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500, easing: 'ease', fill: 'forwards' });
@@ -156,34 +180,38 @@ function App() {
 	const switchOnLeaveUI = () => {
 		gameSummaryRef.current?.classList.toggle("hidden");
 		startScreenContentRef.current?.classList.toggle("hidden");
+		lobbiesListRef.current?.classList.toggle("hidden");
 	};
 
 	const createLobby = () => {
 		if (lobbyName && username) {
 			socket.emit("createLobby", lobbyName, username);
+		} else {
+			ssfeedbackRef.current!.innerText = "Please enter a username and lobby name.";
 		}
 	};
 
-	const joinLobby = () => {
-		if (lobbyName && username) {
-			socket.emit("joinLobby", lobbyName, username);
+	const joinLobby = (lobby = lobbyName) => {
+		if (lobby && username) {
+			socket.emit("joinLobby", lobby, username);
+		} else {
+			ssfeedbackRef.current!.innerText = "Please enter a username and lobby name.";
 		}
 	};
 
 	const startGame = () => {
-		const feedbackElement = document.getElementById('gsfeedback') as HTMLElement;
 		if (lobbyPlayers.some(player => player.username === username && player.isHost)) {
 			const rounds = parseInt((document.getElementById('rounds') as HTMLInputElement).value);
 			if (rounds < 1 || rounds > 30 || isNaN(rounds)) {
-				feedbackElement.innerHTML = "Invalid number of rounds. (1-30)";
+				gsfeedbackRef.current!.innerText = "Invalid number of rounds. (1-30)";
 				return;
 			} else {
-				feedbackElement.innerHTML = "";
+				gsfeedbackRef.current!.innerText = "";
 			}
 			socket.emit('announceGameStart', lobbyName, rounds);
 			socket.emit('announceRoundStart', lobbyName);
 		} else {
-			feedbackElement.innerHTML = "You are not the host.";
+			gsfeedbackRef.current!.innerText = "You are not the host.";
 		}
 	};
 
@@ -217,6 +245,7 @@ function App() {
 	const onLobbyReturn = () => {
 		gameSummaryRef.current?.classList.add('hidden');
 		startScreenContentRef.current?.classList.remove("hidden");
+		lobbiesListRef.current?.classList.remove("hidden");
 		if (lobbyPlayers.some(player => player.username === username && player.isHost)) {
 			hostControlsRef.current?.classList.remove("invisible");
 			timerRef.current?.classList.add('invisible');
@@ -227,7 +256,7 @@ function App() {
 
 	return (
 		<div className="main">
-			<Sidebar players={lobbyPlayers} gainNodeRef={gainNodeRef} ref={sidebarRef} />
+			<Sidebar players={lobbyPlayers} gainNodeRef={gainNodeRef} sidebarRef={sidebarRef} />
 			<div className="main-screen" ref={mainScreenRef}>
 				<h1>BARGEBO GUESSER</h1>
 				<div className='start-screen-content' ref={startScreenContentRef}>
@@ -248,20 +277,41 @@ function App() {
 							onChange={(e) => setLobbyName(e.target.value)}
 							type="text"
 						/>
-						<p id='ssfeedback' className='error'></p>
+						<p id='ssfeedback' className='error' ref={ssfeedbackRef}></p>
 					</div>
 					<div className='start-screen-buttons'>
-						<button type="submit" onClick={joinLobby}>Join Lobby</button>
-						<button type="submit" onClick={createLobby}>Create Lobby</button>
+						<button type="submit" onClick={() => joinLobby()}>Join Lobby</button>
+						<button type="submit" onClick={() => createLobby()}>Create Lobby</button>
 					</div>
 				</div>
+				{isDevMode ? (
+					<div className='lobbies-list' ref={lobbiesListRef}>
+						<h2>Available lobbies:</h2>
+						<ul id='lobbiesList'>
+							{Object.entries(lobbyList).map(([lobbyName, lobby]) => {
+								if (!lobby.players || lobby.roundStarted) return null;
+								return (
+									<li key={lobbyName}>
+										<h2>{lobbyName}</h2>
+										<p>Players: {lobby.players.length}</p>
+										<p>Rounds: {lobby.currentRound} / {lobby.rounds}</p>
+										{/* <p>Status: {lobby.roundStarted ? "In Progress" : "Waiting"}</p> */}
+										<button className='join-lobby-button' onClick={() => joinLobby(lobbyName)} title={`Join ${lobbyName} lobby`}>
+											<svg stroke="var(--correct-color)" fill="var(--correct-color)" strokeWidth="0" viewBox="0 0 448 512" height="20px" width="20px" xmlns="http://www.w3.org/2000/svg"><path d="M424.4 214.7L72.4 6.6C43.8-10.3 0 6.1 0 47.9V464c0 37.5 40.7 60.1 72.4 41.3l352-208c31.4-18.5 31.5-64.1 0-82.6z"></path></svg>
+										</button>
+									</li>
+								)
+							})}
+						</ul>
+					</div>
+				) : null}
 				<div className='game-screen-content hidden' ref={gameScreenContentRef}>
 					<h2 className='timer hidden' ref={timerRef}>Time: 0s</h2>
 					<div className='host-controls invisible' ref={hostControlsRef}>
 						<div>
 							<label>Number of rounds:</label>
 							<input id='rounds' type="number" min={1} max={30} placeholder="Number of rounds" />
-							<p id='gsfeedback' className='error'></p>
+							<p id='gsfeedback' className='error' ref={gsfeedbackRef}></p>
 							<button className='submitButton' type="submit" onClick={startGame}>Start</button>
 						</div>
 					</div>

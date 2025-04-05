@@ -9,12 +9,12 @@ interface Player {
 
 interface Props {
     gainNodeRef: React.RefObject<GainNode | null>;
-    ref: React.RefObject<HTMLDivElement | null>;
+    sidebarRef: React.RefObject<HTMLDivElement | null>;
 }
 
 function Sidebar(props: { players: Player[] } & Props) {
     const gainNodeRef = props.gainNodeRef;
-    const sidebarRef = props.ref;
+    const sidebarRef = props.sidebarRef;
     const { players } = props;
 
     const initialVolume = Number(localStorage.getItem('volume')) || 50;
@@ -53,6 +53,10 @@ function Sidebar(props: { players: Player[] } & Props) {
 
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
+        if (localStorage.getItem('specialEffects') === null) localStorage.setItem('specialEffects', 'true');
+        if (localStorage.getItem('devMode') === null) localStorage.setItem('devMode', 'false');
+        (document.getElementById('specialEffects') as HTMLInputElement).checked = localStorage.getItem('specialEffects') === 'true';
+        (document.getElementById('devMode') as HTMLInputElement).checked = localStorage.getItem('devMode') === 'true';
     }, [theme]);
 
     return (
@@ -62,6 +66,9 @@ function Sidebar(props: { players: Player[] } & Props) {
                     <h2>Settings</h2>
                     <label htmlFor="specialEffects">Special effects</label>
                     <input type="checkbox" id="specialEffects" name="specialEffects" value="specialEffects" onChange={(e) => localStorage.setItem('specialEffects', JSON.stringify(e.target.checked))} defaultChecked />
+                    <br />
+                    <label htmlFor="devMode">Developer mode</label>
+                    <input type="checkbox" id="devMode" name="devMode" value="devMode" onChange={(e) => localStorage.setItem('devMode', JSON.stringify(e.target.checked))} />
                     <br />
                     <label htmlFor="darkMode">Theme: </label>
                     <select id="theme" name="theme" value={theme} onChange={(e) => handleThemeChange(e.target.value)}>
