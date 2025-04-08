@@ -318,7 +318,7 @@ function App() {
 				</div>
 				<SongPicker songs={songs} onSongSelect={onSongSelection} ref={songPickerRef} />
 				<GameSummary players={lobbyPlayers} onLeaveLobby={onLeaveLobby} onLobbyReturn={onLobbyReturn} ref={gameSummaryRef} />
-				<footer>Borys Gajewki & Mateusz Antkiewicz @ 2025</footer>
+				<footer>Borys Gajewski & Mateusz Antkiewicz @ 2025</footer>
 			</div>
 		</div>
 	);

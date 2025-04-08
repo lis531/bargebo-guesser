@@ -66,6 +66,7 @@
         padding: 50px;
         border: 2px solid rgb(127 127 127 / 50%);
         border-radius: 10px;
+        width: min-content;
         h2 {
             margin-top: 0;
             margin-bottom: 25px;
@@ -75,6 +76,7 @@
 
 .leaderboard {
     width: 86%;
+    opacity: 0;
 }
 
 .leaderboard-players {

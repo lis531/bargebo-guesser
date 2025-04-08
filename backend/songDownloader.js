@@ -1,7 +1,6 @@
 import ytSearch from 'yt-search';
 import { exec } from 'child_process';
 import fs from 'fs';
-
 import admin from 'firebase-admin';
 import dotenv from 'dotenv';
 
@@ -29,6 +28,7 @@ admin.initializeApp({
 const bucket = admin.storage().bucket();
 
 const LAST_FM_API_KEY = process.env.LAST_FM_API_KEY;
+const REPLACE_FILES = true;
 
 async function fetchTracks() {
     const limit = 50;
@@ -39,6 +39,10 @@ async function fetchTracks() {
         const url = `http://ws.audioscrobbler.com/2.0/?method=chart.gettoptracks&api_key=${LAST_FM_API_KEY}&format=json&limit=${limit}&page=${page}`;
         const response = await fetch(url);
         const data = await response.json();
+
+        if (allTracks.some(track => track.name === data.tracks.track[0].name)) {
+            continue;
+        }
 
         if (data.tracks && data.tracks.track) {
             allTracks.push(...data.tracks.track);
@@ -57,37 +61,75 @@ async function fetchTracks() {
 }
 
 async function updateSongDB() {
-    let allSongs = await fetchTracks();
+    let existingSongs = [];
+    if (fs.existsSync('db.json')) {
+        try {
+            const fileContent = fs.readFileSync('db.json', 'utf8');
+            if (fileContent && fileContent.trim() !== '') {
+                existingSongs = JSON.parse(fileContent);
+                console.log(`Loaded ${existingSongs.length} existing songs from db.json`);
+            }
+        } catch (err) {
+            console.error(`Error reading existing db.json: ${err.message}`);
+        }
+    }
+
+    const existingTitleArtistPairs = new Set(existingSongs.map(song => `${song.title.toLowerCase()}|${song.artist.toLowerCase()}`));
+
+    const uniqueExistingSongs = existingSongs.filter((song, index, self) => {
+        const key = `${song.title.toLowerCase()}|${song.artist.toLowerCase()}`;
+        return index === self.findIndex(s => `${s.title.toLowerCase()}|${s.artist.toLowerCase()}` === key);
+    });
+
+    if (uniqueExistingSongs.length !== existingSongs.length) {
+        console.log(`Found ${existingSongs.length - uniqueExistingSongs.length} duplicates in existing songs`);
+        existingSongs = uniqueExistingSongs;
+    }
+
+    let newSongs = await fetchTracks();
+
+    const uniqueNewSongs = newSongs.filter(song => { const key = `${song.title.toLowerCase()}|${song.artist.toLowerCase()}`; return !existingTitleArtistPairs.has(key); });
+
+    console.log(`Found ${uniqueNewSongs.length} new unique songs`);
 
     const BLOCK_SIZE = 100;
-    for (let blockID = 0; blockID < Math.ceil(allSongs.length / BLOCK_SIZE); blockID++) {
+    for (let blockID = 0; blockID < Math.ceil(uniqueNewSongs.length / BLOCK_SIZE); blockID++) {
         console.log("Starting block " + blockID + " at i=" + (blockID * BLOCK_SIZE));
 
         const promises = [];
-        for (let i = blockID * BLOCK_SIZE, j = 0; i < allSongs.length && j < BLOCK_SIZE; i++, j++) {
-            const query = allSongs[i].title + " " + allSongs[i].artist;
+        for (let i = blockID * BLOCK_SIZE, j = 0; i < uniqueNewSongs.length && j < BLOCK_SIZE; i++, j++) {
+            const query = uniqueNewSongs[i].title + " " + uniqueNewSongs[i].artist;
             promises.push(ytSearch(query));
         }
 
-        for (let i = blockID * BLOCK_SIZE, j = 0; i < allSongs.length && j < BLOCK_SIZE; i++, j++) {
+        for (let i = blockID * BLOCK_SIZE, j = 0; i < uniqueNewSongs.length && j < BLOCK_SIZE; i++, j++) {
             const result = await promises[j];
             const videoURL = result.videos[0].url;
             const videoID = videoURL.split('watch?v=')[1];
-            allSongs[i].id = videoID;
+            uniqueNewSongs[i].id = videoID;
 
             if ((i + 1) % 10 === 0) {
-                console.log("Processed " + (i + 1) + " out of " + allSongs.length + " songs.")
+                console.log("Processed " + (i + 1) + " out of " + uniqueNewSongs.length + " songs.")
             }
         }
     }
+
+    const allSongs = [...existingSongs, ...uniqueNewSongs];
 
     fs.writeFile('db.json', JSON.stringify(allSongs), (err) => {
         if (err) {
             console.error('Error writing file:', err);
         } else {
-            console.log('File written successfully!');
+            console.log(`File written successfully with ${allSongs.length} total songs!`);
         }
     });
+
+    for (let i = 0; i < allSongs.length; i++) {
+        allSongs[i].cover = `https://img.youtube.com/vi/${allSongs[i].id}/0.jpg`;
+        allSongs[i].url = `https://www.youtube.com/watch?v=${allSongs[i].id}`;
+        delete allSongs[i].id;
+    }
+    await downloadSongsDB(allSongs);
 }
 
 async function downloadSong(videoUrl) {
@@ -100,7 +142,7 @@ async function downloadSong(videoUrl) {
     }
 
     return new Promise((resolve, reject) => {
-        exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:10" --force-overwrites --audio-format mp3 -o "audio/${videoID}.%(ext)s" ${videoUrl}`, (error, stdout, stderr) => {
+        exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:10" --force-overwrites -filter:a dynaudnorm --audio-format mp3 -o "audio/${videoID}.%(ext)s" ${videoUrl}`, (error, stdout, stderr) => {
             if (error) {
                 console.error(`Error downloading track: ${error.message}`);
                 reject(error);
@@ -120,17 +162,17 @@ async function uploadFirebase(videoUrl) {
     try {
         const [exists] = await file.exists();
 
-        if (exists) {
+        if (exists && !REPLACE_FILES) {
             const [url] = await file.getSignedUrl({
                 action: 'read',
                 expires: '03-09-2030'
             });
-            //console.log(`already exists in Firebase Storage.`);
+            // console.log(`already exists in Firebase Storage.`);
             return url;
         }
 
         return await new Promise((resolve, reject) => {
-            exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:10" --force-overwrites --audio-format mp3 -o "${filePath}" ${videoUrl}`, async (error) => {
+            exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:20" --force-overwrites --audio-format mp3 --postprocessor-args "ffmpeg:-filter:a dynaudnorm" -o "${filePath}" ${videoUrl}`, async (error) => {
                 if (error) {
                     console.error(`Error downloading track: ${error.message}`);
                     reject(error);
@@ -166,6 +208,7 @@ async function uploadFirebase(videoUrl) {
         return null;
     }
 }
+
 async function downloadSongsDB(songsDB) {
     const BLOCK_SIZE = 4;
     for (let blockID = 0; blockID < Math.ceil(songsDB.length / BLOCK_SIZE); blockID++) {
@@ -186,12 +229,4 @@ async function downloadSongsDB(songsDB) {
     }
 }
 
-//await updateSongDB();
-
-const allSongs = JSON.parse(fs.readFileSync(`./db.json`, 'utf8'));
-for (let i = 0; i < allSongs.length; i++) {
-    allSongs[i].cover = `https://img.youtube.com/vi/${allSongs[i].id}/0.jpg`;
-    allSongs[i].url = `https://www.youtube.com/watch?v=${allSongs[i].id}`;
-    delete allSongs[i].id;
-}
-await downloadSongsDB(allSongs);
+await updateSongDB();

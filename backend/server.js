@@ -49,8 +49,6 @@ app.use((req, res, next) => {
     next();
 });
 
-let numberOfDownloads = 0;
-
 function streamToBuffer(stream) {
     return new Promise((resolve, reject) => {
         const chunks = [];
@@ -97,7 +95,6 @@ for (let i = 0; i < allSongs.length; i++) {
 }
 
 console.log("Loaded the songs DB of " + allSongs.length + " songs.");
-console.log("Downloaded " + numberOfDownloads + " songs.");
 
 async function announceRoundStart(lobbyName) {
     if (!lobbies[lobbyName]) return;
@@ -159,7 +156,7 @@ async function announceRoundEnd(lobbyName) {
 
     clearTimeout(lobbies[lobbyName].answerTimeout);
     clearInterval(lobbies[lobbyName].timerInterval);
-    
+
     lobbies[lobbyName].roundStarted = false;
     io.to(lobbyName).emit('onRoundEnd');
 
@@ -254,12 +251,12 @@ io.on('connection', (socket) => {
                         lobbies[lobbyName].firstAnswerPlayerId = socket.id;
                         player.score += 50;
                     }
-        
+
                     const maxScore = 500;
                     const minScore = 80;
                     const timeLimit = 20;
                     const timePassed = lobbies[lobbyName].timePassed;
-        
+
                     if (timePassed <= 0.5) {
                         player.score += maxScore;
                     } else {
