@@ -41,12 +41,19 @@ function SongPicker({ songs, onSongSelect, ref }: Props) {
         });
     };
 
+    const handleImageLoad = (img: HTMLImageElement) => {
+        img.animate([
+            { opacity: 0, filter: 'blur(10px)' },
+            { opacity: 1, filter: 'blur(0px)' }
+        ], 300);
+    }
+
     return (
         <div className="song-picker hidden" ref={ref}>
             <h2>Choose a song</h2>
             <div className="song-picker-songs">
                 {songs.map((song, index) => (
-                    <div key={index} id={index.toString()} className="song-picker-song" onClick={() => { songSelected(index) }}>
+                    <div key={index} id={index.toString()} className="song-picker-song" onClick={() => { songSelected(index) }} onLoad={(e) => handleImageLoad(e.currentTarget.children[0] as HTMLImageElement)}>
                         <img src={song.cover || 'public/no-image.jpg'} alt="Song cover" />
                         <div className="song-info">
                             <p>{song.title}</p>

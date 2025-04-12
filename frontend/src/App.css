@@ -113,7 +113,7 @@
 			transform: translateY(0.5em);
 		}
 		&:hover {
-			border-color: var(--link-hover-color);
+			border-color: var(--accent-color);
 		}
 		&:hover > .join-lobby-button {
 			opacity: 1;

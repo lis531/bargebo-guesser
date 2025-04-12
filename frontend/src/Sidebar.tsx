@@ -10,11 +10,13 @@ interface Player {
 interface Props {
     gainNodeRef: React.RefObject<GainNode | null>;
     sidebarRef: React.RefObject<HTMLDivElement | null>;
+    onLeaveLobby: () => void;
 }
 
 function Sidebar(props: { players: Player[] } & Props) {
     const gainNodeRef = props.gainNodeRef;
     const sidebarRef = props.sidebarRef;
+    const onLeaveLobby = props.onLeaveLobby;
     const { players } = props;
 
     const initialVolume = Number(localStorage.getItem('volume')) || 50;
@@ -80,6 +82,7 @@ function Sidebar(props: { players: Player[] } & Props) {
             </dialog>
             <div className="sidebar" ref={sidebarRef}>
                 <div className="leaderboard">
+                    <button onClick={onLeaveLobby}>Leave Lobby</button>
                     <h2>Leaderboard</h2>
                     <h3 id="roundNumber">Round: </h3>
                     <div className="leaderboard-players">

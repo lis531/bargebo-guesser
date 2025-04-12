@@ -41,7 +41,7 @@
     max-width: 25ch;
     width: 100%;
     border-radius: 10%;
-    background-color: #1a1a1a;
+    background-color: var(--additional-color);
     overflow: hidden;
     cursor: pointer;
 
@@ -55,7 +55,6 @@
     }
 
     &.disabled:not(.selected) {
-        background-color: #000000;
         color: red;
         opacity: 0.5;
         cursor: not-allowed;

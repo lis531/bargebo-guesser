@@ -48,6 +48,7 @@ function App() {
 	const gameSummaryRef = useRef<HTMLDivElement>(null);
 	const ssfeedbackRef = useRef<HTMLParagraphElement>(null);
 	const gsfeedbackRef = useRef<HTMLParagraphElement>(null);
+	const roundSummaryRef = useRef<HTMLDivElement>(null);
 
 	const [isDevMode, _] = useState<boolean>(localStorage.getItem('devMode') === 'true');
 
@@ -109,23 +110,27 @@ function App() {
 			setCorrectSongIndex(correctIndex);
 			setSongs(allSongs);
 
-			const roundNumber = document.getElementById('roundNumber') as HTMLElement;
-			roundNumber.innerHTML = `Round: ${currentRounds} / ${rounds}`;
+			roundSummaryRef.current?.animate([{ transform: 'translateY(0%)', opacity: 1 }, { transform: 'translateY(30%)', opacity: 0 }], { duration: 100, easing: 'ease', fill: 'forwards' }).finished.then(() => {
+				roundSummaryRef.current?.classList.add('hidden');
+				gameScreenContentRef.current?.classList.remove('hidden');
+				gameScreenContentRef.current?.animate([{ transform: 'translateY(100%)', opacity: 0 }, { transform: 'translateY(0%)', opacity: 1 }], { duration: 400, easing: 'ease', fill: 'forwards' });
+				const roundNumber = document.getElementById('roundNumber') as HTMLElement;
+				roundNumber.innerHTML = `Round: ${currentRounds} / ${rounds}`;
+				timerRef.current?.classList.remove('invisible');
+				if (songPickerRef.current?.classList.contains('invisible')) {
+					songPickerRef.current?.classList.remove('invisible');
+					songPickerRef.current?.animate([{ transform: 'translateY(100%)', opacity: 0 }, { transform: 'translateY(0%)', opacity: 1 }], { duration: 400, easing: 'ease', fill: 'forwards' });
+				}
 
-			timerRef.current?.classList.remove('invisible');
-			if (songPickerRef.current?.classList.contains('invisible')) {
-				songPickerRef.current?.classList.remove('invisible');
-				songPickerRef.current?.animate([{ transform: 'translateY(100%)', opacity: 0 }, { transform: 'translateY(0%)', opacity: 1 }], { duration: 500, easing: 'ease', fill: 'forwards' });
-			}
-
-			audioContextRef.current!.decodeAudioData(correctSongData, (buffer) => {
-				sourceAudioBufferRef.current = audioContextRef.current!.createBufferSource();
-				sourceAudioBufferRef.current.connect(gainNodeRef.current!);
-				sourceAudioBufferRef.current.buffer = buffer;
-				sourceAudioBufferRef.current.start();
-			}, (err) => {
-				console.log("Playback error: " + err);
-			});
+				audioContextRef.current!.decodeAudioData(correctSongData, (buffer) => {
+					sourceAudioBufferRef.current = audioContextRef.current!.createBufferSource();
+					sourceAudioBufferRef.current.connect(gainNodeRef.current!);
+					sourceAudioBufferRef.current.buffer = buffer;
+					sourceAudioBufferRef.current.start();
+				}, (err) => {
+					console.log("Playback error: " + err);
+				});
+			});			
 		});
 
 		socket.on('onGameEnd', () => {
@@ -133,15 +138,18 @@ function App() {
 				sourceAudioBufferRef.current.stop();
 				sourceAudioBufferRef.current = null;
 			}
+			roundSummaryRef.current?.classList.add('hidden');
 			gameScreenContentRef.current?.classList.add('hidden');
-			songPickerRef.current?.animate([{ transform: 'translateY(0%)', opacity: 1 }, { transform: 'translateY(100%)', opacity: 0 }], { duration: 500, easing: 'ease', fill: 'forwards' }).finished.then(() => {
+			songPickerRef.current?.animate([{ transform: 'translateY(0%)', opacity: 1 }, { transform: 'translateY(100%)', opacity: 0 }], { duration: 400, easing: 'ease', fill: 'forwards' }).finished.then(() => {
 				const sidebarWidth = sidebarRef.current?.getBoundingClientRect().width;
 				songPickerRef.current?.classList.add('hidden');
-				mainScreenRef.current?.animate([{ paddingLeft: `${sidebarWidth}px` }, { paddingLeft: '0%' }], { duration: 500, easing: 'ease', fill: 'forwards' });
-				sidebarRef.current?.animate([{ transform: 'translateX(0%)' }, { transform: 'translateX(calc(-100% + 66px))' }], { duration: 500, easing: 'ease', fill: 'forwards' });
-				sidebarRef.current?.children[0].animate([{ opacity: 1 }, { opacity: 0 }], { duration: 500, easing: 'ease', fill: 'forwards' });
+				mainScreenRef.current?.animate([{ paddingLeft: `${sidebarWidth}px` }, { paddingLeft: '0%' }], { duration: 400, easing: 'ease', fill: 'forwards' });
+				sidebarRef.current?.classList.remove('open');
+				sidebarRef.current?.animate([{ transform: 'translateX(0%)' }, { transform: 'translateX(calc(-100% + 66px))' }], { duration: 400, easing: 'ease', fill: 'forwards' });
+				sidebarRef.current?.children[0].animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, easing: 'ease', fill: 'forwards' });
 			});
 			gameSummaryRef.current?.classList.remove('hidden');
+			gameSummaryRef.current?.animate([{ transform: 'translateY(100%)', opacity: 0 }, { transform: 'translateY(0%)', opacity: 1 }], { duration: 400, easing: 'ease', fill: 'forwards' });
 		});
 
 		socket.on('onRoundEnd', () => {
@@ -149,7 +157,15 @@ function App() {
 				sourceAudioBufferRef.current.stop();
 				sourceAudioBufferRef.current = null;
 			}
-			socket.emit('announceRoundStart', lobbyName);
+			songPickerRef.current?.animate([{ transform: 'translateY(0%)', opacity: 1 }, { transform: 'translateY(100%)', opacity: 0 }], { duration: 300, easing: 'ease', fill: 'forwards' }).finished.then(() => {
+				songPickerRef.current?.classList.add('invisible');
+			});
+			gameScreenContentRef.current?.animate([{ transform: 'translateY(0%)', opacity: 1 }, { transform: 'translateY(100%)', opacity: 0 }], { duration: 300, easing: 'ease', fill: 'forwards' }).finished.then(() => {
+				gameScreenContentRef.current?.classList.add('hidden');
+				roundSummaryRef.current?.classList.remove('hidden');
+				roundSummaryRef.current?.animate([{ transform: 'translateY(100%)', opacity: 0 }, { transform: 'translateY(0%)', opacity: 1 }], { duration: 400, easing: 'ease', fill: 'forwards' });
+				socket.emit('announceRoundStart', lobbyName);
+			});
 		});
 
 		socket.on('timerChange', (timePassed) => {
@@ -172,15 +188,35 @@ function App() {
 		startScreenContentRef.current?.classList.toggle("hidden");
 		lobbiesListRef.current?.classList.toggle("hidden");
 		gameScreenContentRef.current?.classList.toggle("hidden");
-		sidebarRef.current?.animate([{ transform: 'translateX(calc(-100% + 66px))' }, { transform: 'translateX(0%)' }], { duration: 500, easing: 'ease', fill: 'forwards' });
-		sidebarRef.current?.children[0].animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500, easing: 'ease', fill: 'forwards' });
-		mainScreenRef.current?.animate([{ paddingLeft: '0%' }, { paddingLeft: `${sidebarWidth}px` }], { duration: 500, easing: 'ease', fill: 'forwards' });
+		sidebarRef.current?.classList.add("open");
+		sidebarRef.current?.animate([{ transform: 'translateX(calc(-100% + 66px))' }, { transform: 'translateX(0%)' }], { duration: 400, easing: 'ease', fill: 'forwards' });
+		sidebarRef.current?.children[0].animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, easing: 'ease', fill: 'forwards' });
+		mainScreenRef.current?.animate([{ paddingLeft: '0%' }, { paddingLeft: `${sidebarWidth}px` }], { duration: 400, easing: 'ease', fill: 'forwards' });
 	};
 
 	const switchOnLeaveUI = () => {
-		gameSummaryRef.current?.classList.toggle("hidden");
-		startScreenContentRef.current?.classList.toggle("hidden");
-		lobbiesListRef.current?.classList.toggle("hidden");
+		gameSummaryRef.current?.classList.add("hidden");
+		roundSummaryRef.current?.classList.add("hidden");
+		songPickerRef.current?.classList.add("invisible");
+		songPickerRef.current?.classList.add("hidden");
+		timerRef.current?.classList.add("hidden");
+		gameScreenContentRef.current?.classList.add("hidden");
+		timerRef.current?.classList.add("hidden");
+		hostControlsRef.current?.classList.add("invisible");
+		startScreenContentRef.current?.classList.remove("hidden");
+		lobbiesListRef.current?.classList.remove("hidden");
+		audioContextRef.current?.close();
+		audioContextRef.current = new AudioContext();
+		gainNodeRef.current = audioContextRef.current.createGain();
+		gainNodeRef.current.gain.value = 0.25;
+		gainNodeRef.current.connect(audioContextRef.current.destination);
+		if (sidebarRef.current?.classList.contains("open")) {
+			sidebarRef.current?.classList.remove("open");
+			const sidebarWidth = sidebarRef.current?.getBoundingClientRect().width;
+			sidebarRef.current?.animate([{ transform: 'translateX(0%)' }, { transform: 'translateX(calc(-100% + 66px))' }], { duration: 400, easing: 'ease', fill: 'forwards' });
+			sidebarRef.current?.children[0].animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, easing: 'ease', fill: 'forwards' });
+			mainScreenRef.current?.animate([{ paddingLeft: `${sidebarWidth}px` }, { paddingLeft: '0%' }], { duration: 400, easing: 'ease', fill: 'forwards' });
+		}
 	};
 
 	const createLobby = () => {
@@ -256,7 +292,7 @@ function App() {
 
 	return (
 		<div className="main">
-			<Sidebar players={lobbyPlayers} gainNodeRef={gainNodeRef} sidebarRef={sidebarRef} />
+			<Sidebar players={lobbyPlayers} gainNodeRef={gainNodeRef} sidebarRef={sidebarRef} onLeaveLobby={onLeaveLobby} />
 			<div className="main-screen" ref={mainScreenRef}>
 				<h1>BARGEBO GUESSER</h1>
 				<div className='start-screen-content' ref={startScreenContentRef}>
@@ -315,6 +351,20 @@ function App() {
 							<button className='submitButton' type="submit" onClick={startGame}>Start</button>
 						</div>
 					</div>
+				</div>
+				<div className='round-summary hidden' ref={roundSummaryRef}>
+					<h2>Round Summary</h2>
+					{correctSongIndex !== undefined && songs[correctSongIndex] ? (
+						<p>Correct Song: {songs[correctSongIndex].title} - {songs[correctSongIndex].artist}</p>
+					) : null}
+					<p>Players:</p>
+					<ul>
+						{lobbyPlayers.map((player) => (
+							<li key={player.id}>
+								{player.username} - {player.score} points
+							</li>
+						))}
+					</ul>
 				</div>
 				<SongPicker songs={songs} onSongSelect={onSongSelection} ref={songPickerRef} />
 				<GameSummary players={lobbyPlayers} onLeaveLobby={onLeaveLobby} onLobbyReturn={onLobbyReturn} ref={gameSummaryRef} />

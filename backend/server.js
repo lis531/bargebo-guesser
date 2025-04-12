@@ -126,27 +126,28 @@ async function announceRoundStart(lobbyName) {
             correctSongData = await downloadFirebase(correctVideoUrl);
         }
     }
-    console.log("Starting round...");
+    console.log("Starting round " + lobbies[lobbyName].currentRound);
+    setTimeout(() => {
+        io.to(lobbyName).emit('onRoundStart', selectedTracks, correctIndex, correctSongData, lobbies[lobbyName].currentRound, lobbies[lobbyName].rounds);
 
-    io.to(lobbyName).emit('onRoundStart', selectedTracks, correctIndex, correctSongData, lobbies[lobbyName].currentRound, lobbies[lobbyName].rounds);
+        lobbies[lobbyName].timePassed = 0;
 
-    lobbies[lobbyName].timePassed = 0;
+        const timerInterval = setInterval(() => {
+            if (!lobbies[lobbyName]) {
+                clearInterval(timerInterval);
+                return;
+            }
 
-    const timerInterval = setInterval(() => {
-        if (!lobbies[lobbyName]) {
-            clearInterval(timerInterval);
-            return;
-        }
+            lobbies[lobbyName].timePassed += 0.01;
+            io.to(lobbyName).emit('timerChange', lobbies[lobbyName].timePassed.toFixed(2));
 
-        lobbies[lobbyName].timePassed += 0.01;
-        io.to(lobbyName).emit('timerChange', lobbies[lobbyName].timePassed.toFixed(2));
+            if (lobbies[lobbyName].timePassed >= 20) {
+                announceRoundEnd(lobbyName);
+            }
+        }, 10);
 
-        if (lobbies[lobbyName].timePassed >= 20) {
-            announceRoundEnd(lobbyName);
-        }
-    }, 10);
-
-    lobbies[lobbyName].timerInterval = timerInterval;
+        lobbies[lobbyName].timerInterval = timerInterval;
+    }, lobbies[lobbyName].currentRound == 1 ? 0 : 5000);
 }
 
 async function announceRoundEnd(lobbyName) {
@@ -158,9 +159,9 @@ async function announceRoundEnd(lobbyName) {
     clearInterval(lobbies[lobbyName].timerInterval);
 
     lobbies[lobbyName].roundStarted = false;
-    io.to(lobbyName).emit('onRoundEnd');
 
     if (lobbies[lobbyName].rounds - lobbies[lobbyName].currentRound > 0) {
+        io.to(lobbyName).emit('onRoundEnd');
         announceRoundStart(lobbyName);
     } else {
         console.log("Game ended.");
