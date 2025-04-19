@@ -3,6 +3,7 @@
     flex-direction: column;
     justify-content: flex-end;
     height: 30vh;
+    width: 338px;
     & > div:last-of-type {
         display: flex;
         justify-content: space-between;
@@ -10,16 +11,5 @@
         button {
             width: 161px;
         }
-    }
-}
-
-.game-summary-player {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-top: 10px;
-    & > p > span {
-        font-size: 1.8rem;
     }
 }

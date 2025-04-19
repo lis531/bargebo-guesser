@@ -86,34 +86,42 @@
 	}
 
 	.lobbies-list > ul > li {
+		position: relative;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		width: inherit;
+		color: var(--background-color);
 		background-color: var(--button-background-color);
 		border-radius: 8px;
 		padding: 0.5em 1em;
 		cursor: pointer;
-		border: 2px solid transparent;
 		transition: border-color 0.25s;
 		box-shadow: 0 0 3px 1px #000000, inset 0 0 0 100px rgba(0, 0, 0, 0.5);
 		background-image: url(https://picsum.photos/380/80?random0);
 		background-position: center;
+		overflow: hidden;
 		h2 {
 			margin: 0;
 			font-size: 2em;
-			color: var(--text-color);
 		}
 		.join-lobby-button {
+			width: 100%;
+			height: 100%;
+			background: radial-gradient(
+				circle at 50% 50%,
+				rgba(52, 104, 48, 0.5) 0%,
+				rgba(0, 0, 0, 0.5) 100%
+			);
+			position: absolute;
+			right: 0;
+			bottom: 0;
 			display: flex;
 			justify-content: center;
 			align-items: center;
 			opacity: 0;
 			transition: opacity 0.25s, transform 0.25s;
 			transform: translateY(0.5em);
-		}
-		&:hover {
-			border-color: var(--accent-color);
 		}
 		&:hover > .join-lobby-button {
 			opacity: 1;
@@ -138,6 +146,53 @@
 			&:has(.timer:not(.invisible)) {
 				height: 44vh;
 			}
+		}
+	}
+
+	.round-summary {
+		display: flex;
+		position: relative;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 1em;
+		width: 338px;
+		height: 30vh;
+		h3 {
+			text-align: center;
+		}
+	}
+
+	.summary-list {
+		display: flex;
+		flex-direction: column;
+		padding: 0;
+		list-style-type: none;
+		counter-reset: list-counter;
+		width: 100%;
+		li {
+			counter-increment: list-counter;
+			width: -webkit-fill-available;;
+			position: relative;
+			padding: 0 0 .5em 2em;
+			margin-bottom: 2.5em;
+			border-bottom: 1px solid var(--text-color);
+			text-align: left;
+			display: flex;
+			flex-direction: row;
+			justify-content: space-between;
+			p {
+				margin: 0;
+			}
+		}
+		li::before {
+			content: counter(list-counter) ".";
+			color: var(--text-color);
+			font-size: 2em;
+			line-height: 1;
+			position: absolute;
+			left: 0;
+			bottom: 10px;
 		}
 	}
 

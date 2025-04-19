@@ -106,6 +106,13 @@ function App() {
 				sourceAudioBufferRef.current = null;
 			}
 
+			if (timerRef.current?.classList.contains('hidden')) {
+				timerRef.current?.classList.remove('hidden');
+			}
+			if (songPickerRef.current?.classList.contains('hidden')) {
+				songPickerRef.current?.classList.remove('hidden');
+			}
+
 			resetSongSelection();
 			setCorrectSongIndex(correctIndex);
 			setSongs(allSongs);
@@ -320,27 +327,27 @@ function App() {
 						<button type="submit" onClick={() => createLobby()}>Create Lobby</button>
 					</div>
 				</div>
-				{isDevMode ? (
-					<div className='lobbies-list' ref={lobbiesListRef}>
+				<div className='lobbies-list' ref={lobbiesListRef}>
+					{Object.keys(lobbyList).length > 0 ? (
 						<h2>Available lobbies:</h2>
-						<ul id='lobbiesList'>
-							{Object.entries(lobbyList).map(([lobbyName, lobby]) => {
-								if (!lobby.players || lobby.roundStarted) return null;
-								return (
-									<li key={lobbyName}>
-										<h2>{lobbyName}</h2>
-										<p>Players: {lobby.players.length}</p>
-										<p>Rounds: {lobby.currentRound} / {lobby.rounds}</p>
-										{/* <p>Status: {lobby.roundStarted ? "In Progress" : "Waiting"}</p> */}
-										<button className='join-lobby-button' onClick={() => joinLobby(lobbyName)} title={`Join ${lobbyName} lobby`}>
-											<svg stroke="var(--correct-color)" fill="var(--correct-color)" strokeWidth="0" viewBox="0 0 448 512" height="20px" width="20px" xmlns="http://www.w3.org/2000/svg"><path d="M424.4 214.7L72.4 6.6C43.8-10.3 0 6.1 0 47.9V464c0 37.5 40.7 60.1 72.4 41.3l352-208c31.4-18.5 31.5-64.1 0-82.6z"></path></svg>
-										</button>
-									</li>
-								)
-							})}
-						</ul>
-					</div>
-				) : null}
+					) : null}
+					<ul id='lobbiesList'>
+						{Object.entries(lobbyList).map(([lobbyName, lobby]) => {
+							if (!lobby.players || lobby.roundStarted) return null;
+							return (
+								<li key={lobbyName}>
+									<h2>{lobbyName}</h2>
+									<p>Players: {lobby.players.length}</p>
+									<p>Round: {lobby.currentRound} / {lobby.rounds}</p>
+									<p>Status: {lobby.roundStarted ? "In Progress" : "Waiting"}</p>
+									<button className='join-lobby-button' onClick={() => joinLobby(lobbyName)} title={`Join ${lobbyName} lobby`}>
+										<svg stroke="var(--correct-color)" fill="var(--correct-color)" strokeWidth="0" viewBox="0 0 448 512" height="20px" width="20px" xmlns="http://www.w3.org/2000/svg"><path d="M424.4 214.7L72.4 6.6C43.8-10.3 0 6.1 0 47.9V464c0 37.5 40.7 60.1 72.4 41.3l352-208c31.4-18.5 31.5-64.1 0-82.6z"></path></svg>
+									</button>
+								</li>
+							)
+						})}
+					</ul>
+				</div>
 				<div className='game-screen-content hidden' ref={gameScreenContentRef}>
 					<h2 className='timer hidden' ref={timerRef}>Time: 0s</h2>
 					<div className='host-controls invisible' ref={hostControlsRef}>
@@ -353,18 +360,16 @@ function App() {
 					</div>
 				</div>
 				<div className='round-summary hidden' ref={roundSummaryRef}>
-					<h2>Round Summary</h2>
 					{correctSongIndex !== undefined && songs[correctSongIndex] ? (
-						<p>Correct Song: {songs[correctSongIndex].title} - {songs[correctSongIndex].artist}</p>
+						<h3>Correct Song: {songs[correctSongIndex].title} - {songs[correctSongIndex].artist}</h3>
 					) : null}
-					<p>Players:</p>
-					<ul>
+					<ol className='summary-list'>
 						{lobbyPlayers.map((player) => (
 							<li key={player.id}>
-								{player.username} - {player.score} points
+								<p>{player.username}</p><p>Score: {player.score}</p>
 							</li>
 						))}
-					</ul>
+					</ol>
 				</div>
 				<SongPicker songs={songs} onSongSelect={onSongSelection} ref={songPickerRef} />
 				<GameSummary players={lobbyPlayers} onLeaveLobby={onLeaveLobby} onLobbyReturn={onLobbyReturn} ref={gameSummaryRef} />

@@ -103,6 +103,7 @@ async function announceRoundStart(lobbyName) {
     lobbies[lobbyName].roundStarted = true;
     lobbies[lobbyName].currentRound += 1;
     lobbies[lobbyName].firstAnswerPlayerId = '';
+    io.emit('onLobbyListChanged', lobbies);
 
     console.log("Selecting tracks...");
     const selectedTracks = [];
@@ -239,7 +240,12 @@ io.on('connection', (socket) => {
     });
 
     socket.on('submitAnswer', async (lobbyName, choiceIndex) => {
-        if (!lobbies[lobbyName] || lobbies[lobbyName].roundStarted === false) {
+        if (!lobbies[lobbyName] || !lobbies[lobbyName].roundStarted) {
+            if (!lobbies[lobbyName]) {
+                console.log(`Lobby ${lobbyName} does not exist.`);
+            } else {
+                console.log(`Lobby ${lobbyName} exists, roundStarted: ${lobbies[lobbyName].roundStarted}`);
+            }
             console.log(`${socket.id} submitted answer too late or lobby doesn't exist.`);
             return;
         }
@@ -281,7 +287,9 @@ io.on('connection', (socket) => {
         console.log("All players submitted their answers.");
 
         const answerTimeout = setTimeout(() => {
-            announceRoundEnd(lobbyName);
+            if (lobbies[lobbyName]) {
+                announceRoundEnd(lobbyName);
+            }
         }, 5000);
 
         lobbies[lobbyName].answerTimeout = answerTimeout;
@@ -293,6 +301,9 @@ io.on('connection', (socket) => {
             console.log(`Client disconnected: ${socket.id}`);
             io.to(lobby).emit('onPlayersChanged', lobbies[lobby].players.sort((a, b) => b.score - a.score));
             if (lobbies[lobby].players.length === 0) {
+                if (lobbies[lobby].answerTimeout) {
+                    clearTimeout(lobbies[lobby].answerTimeout);
+                }
                 delete lobbies[lobby];
                 io.emit('onLobbyListChanged', lobbies);
             }
@@ -305,6 +316,9 @@ io.on('connection', (socket) => {
         socket.leave(lobbyName);
         io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
         if (lobbies[lobbyName].players.length === 0) {
+            if (lobbies[lobbyName].answerTimeout) {
+                clearTimeout(lobbies[lobbyName].answerTimeout);
+            }
             delete lobbies[lobbyName];
             io.emit('onLobbyListChanged', lobbies);
         }

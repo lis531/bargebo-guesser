@@ -23,15 +23,15 @@ function GameSummary({ players, onLeaveLobby, onLobbyReturn, ref }: Props) {
         <div className="hidden game-summary" ref={ref}>
             <h2>Game Summary</h2>
             <div className="game-summary-players">
-                {players.map((player, index) => (
-                    <div key={index} className="game-summary-player">
-                        <p><span>{index + 1}.</span> {player.username}</p>
-                        <p>Score: {player.score}</p>
-                    </div>
-                ))}
+                <ol className='summary-list'>
+					{players.map((player, index) => (
+						<li key={index}>
+							<p>{player.username}</p><p>Score: {player.score}</p>
+						</li>
+					))}
+				</ol>
             </div>
             <div>
-                {/* <button className="hidden">Play Again</button> */}
                 <button onClick={() => leaveLobby()}>Leave</button>
                 <button onClick={() => returnToLobby()}>Return to lobby</button>
             </div>

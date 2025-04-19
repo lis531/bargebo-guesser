@@ -16,16 +16,31 @@
     & > h2 {
         margin-top: 30%;
     }
-    .settings-button {
-        position: fixed;
-        bottom: 20px;
-        right: 12px;
+    .sidebar-buttons {
+        display: flex;
+        width: calc(100% - 40px);
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 0 3px 8px 20px;
+        transition: padding 0.3s ease-in-out;
+    }
+    &.open {
+        .sidebar-buttons {
+            padding: 0 20px 8px 20px;
+        }
+    }
+    .settings-button, .leave-button {
         display: flex;
         padding: 4px;
         box-shadow: 0 0 3px 1px rgba(0, 0, 0, 0.5);
         & > svg {
             transition: rotate 0.3s ease-in-out;
         }
+
+    }
+    .settings-button {
         &:hover > svg {
             rotate: 90deg;
         }
@@ -33,7 +48,6 @@
     .volume {
 		display: flex;
 		flex-direction: column;
-		margin: 1em;
 		& > label {
 			text-indent: 0.3rem;
 			margin-bottom: 0.1em;
