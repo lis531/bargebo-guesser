@@ -50,7 +50,7 @@ function App() {
 	const gsfeedbackRef = useRef<HTMLParagraphElement>(null);
 	const roundSummaryRef = useRef<HTMLDivElement>(null);
 
-	const [isDevMode, _] = useState<boolean>(localStorage.getItem('devMode') === 'true');
+	// const [isDevMode, _] = useState<boolean>(localStorage.getItem('devMode') === 'true');
 
 	useEffect(() => {
 		audioContextRef.current = new AudioContext();
@@ -130,6 +130,11 @@ function App() {
 				}
 
 				audioContextRef.current!.decodeAudioData(correctSongData, (buffer) => {
+					if (sourceAudioBufferRef.current) {
+						sourceAudioBufferRef.current.stop();
+						sourceAudioBufferRef.current.disconnect();
+						sourceAudioBufferRef.current = null;
+					}
 					sourceAudioBufferRef.current = audioContextRef.current!.createBufferSource();
 					sourceAudioBufferRef.current.connect(gainNodeRef.current!);
 					sourceAudioBufferRef.current.buffer = buffer;

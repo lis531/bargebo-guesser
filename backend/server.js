@@ -109,6 +109,11 @@ async function announceRoundStart(lobbyName) {
     const selectedTracks = [];
     for (let i = 0; i < NUM_SONGS_TO_GUESS; i++) {
         const randomIndex = Math.floor(Math.random() * allSongs.length);
+        const isDuplicate = selectedTracks.some(track => track.url === allSongs[randomIndex].url);
+        if (isDuplicate) {
+            i--;
+            continue;
+        }
         selectedTracks.push(allSongs[randomIndex]);
     }
 

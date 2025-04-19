@@ -28,7 +28,8 @@ admin.initializeApp({
 const bucket = admin.storage().bucket();
 
 const LAST_FM_API_KEY = process.env.LAST_FM_API_KEY;
-const REPLACE_FILES = true;
+const REPLACE_FILES = false;
+const DOWNLOAD_ONLY_NEW = true;
 
 async function fetchTracks() {
     const limit = 50;
@@ -62,6 +63,7 @@ async function fetchTracks() {
 
 async function updateSongDB() {
     let existingSongs = [];
+    let blacklist = [];
     if (fs.existsSync('db.json')) {
         try {
             const fileContent = fs.readFileSync('db.json', 'utf8');
@@ -73,22 +75,47 @@ async function updateSongDB() {
             console.error(`Error reading existing db.json: ${err.message}`);
         }
     }
+    if (fs.existsSync('blacklist.json')) {
+        try {
+            const content = fs.readFileSync('blacklist.json', 'utf8');
+            if (content && content.trim() !== '') {
+                blacklist = JSON.parse(content);
+            }
+        } catch (err) {
+            console.error(`Error reading blacklist.json: ${err.message}`);
+        }
+    }
 
-    const existingTitleArtistPairs = new Set(existingSongs.map(song => `${song.title.toLowerCase()}|${song.artist.toLowerCase()}`));
+    const isBlacklisted = (song) =>
+        blacklist.some(
+            s =>
+                s.title.toLowerCase() === song.title.toLowerCase() &&
+                s.artist.toLowerCase() === song.artist.toLowerCase()
+        );
+
+    const existingTitleArtistPairs = new Set(
+        existingSongs.map(song => `${song.title.toLowerCase()}|${song.artist.toLowerCase()}`)
+    );
 
     const uniqueExistingSongs = existingSongs.filter((song, index, self) => {
         const key = `${song.title.toLowerCase()}|${song.artist.toLowerCase()}`;
-        return index === self.findIndex(s => `${s.title.toLowerCase()}|${s.artist.toLowerCase()}` === key);
+        return (
+            index === self.findIndex(s => `${s.title.toLowerCase()}|${s.artist.toLowerCase()}` === key) &&
+            !isBlacklisted(song)
+        );
     });
 
     if (uniqueExistingSongs.length !== existingSongs.length) {
-        console.log(`Found ${existingSongs.length - uniqueExistingSongs.length} duplicates in existing songs`);
+        console.log(`Found ${existingSongs.length - uniqueExistingSongs.length} duplicates or blacklisted in existing songs`);
         existingSongs = uniqueExistingSongs;
     }
 
     let newSongs = await fetchTracks();
 
-    const uniqueNewSongs = newSongs.filter(song => { const key = `${song.title.toLowerCase()}|${song.artist.toLowerCase()}`; return !existingTitleArtistPairs.has(key); });
+    let uniqueNewSongs = newSongs.filter(song => {
+        const key = `${song.title.toLowerCase()}|${song.artist.toLowerCase()}`;
+        return !existingTitleArtistPairs.has(key) && !isBlacklisted(song);
+    });
 
     console.log(`Found ${uniqueNewSongs.length} new unique songs`);
 
@@ -116,7 +143,7 @@ async function updateSongDB() {
 
     const allSongs = [...existingSongs, ...uniqueNewSongs];
 
-    fs.writeFile('db.json', JSON.stringify(allSongs), (err) => {
+    fs.writeFile('db.json', JSON.stringify(allSongs, null, 2), (err) => {
         if (err) {
             console.error('Error writing file:', err);
         } else {
@@ -124,12 +151,11 @@ async function updateSongDB() {
         }
     });
 
-    for (let i = 0; i < allSongs.length; i++) {
-        allSongs[i].cover = `https://img.youtube.com/vi/${allSongs[i].id}/0.jpg`;
-        allSongs[i].url = `https://www.youtube.com/watch?v=${allSongs[i].id}`;
-        delete allSongs[i].id;
+    if (DOWNLOAD_ONLY_NEW) {
+        await downloadSongsDB(uniqueNewSongs);
+    } else {
+        await downloadSongsDB(allSongs);
     }
-    await downloadSongsDB(allSongs);
 }
 
 async function downloadSong(videoUrl) {
@@ -142,7 +168,7 @@ async function downloadSong(videoUrl) {
     }
 
     return new Promise((resolve, reject) => {
-        exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:10" --force-overwrites -filter:a dynaudnorm --audio-format mp3 -o "audio/${videoID}.%(ext)s" ${videoUrl}`, (error, stdout, stderr) => {
+        exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:20" --force-overwrites --audio-format mp3 --postprocessor-args "ffmpeg:-filter:a dynaudnorm" -o "${`audio/${videoID}.mp3`}" ${videoUrl}`, async (error) => {
             if (error) {
                 console.error(`Error downloading track: ${error.message}`);
                 reject(error);
@@ -167,7 +193,6 @@ async function uploadFirebase(videoUrl) {
                 action: 'read',
                 expires: '03-09-2030'
             });
-            // console.log(`already exists in Firebase Storage.`);
             return url;
         }
 
@@ -211,22 +236,53 @@ async function uploadFirebase(videoUrl) {
 
 async function downloadSongsDB(songsDB) {
     const BLOCK_SIZE = 4;
-    for (let blockID = 0; blockID < Math.ceil(songsDB.length / BLOCK_SIZE); blockID++) {
-        //console.log("Starting block " + blockID + " at i=" + (blockID * BLOCK_SIZE));
+    let blacklist = [];
 
+    if (fs.existsSync('blacklist.json')) {
+        try {
+            const content = fs.readFileSync('blacklist.json', 'utf8');
+            if (content && content.trim() !== '') {
+                blacklist = JSON.parse(content);
+            }
+        } catch (err) {
+            console.error(`Error reading blacklist.json: ${err.message}`);
+        }
+    }
+
+    let successfulSongs = [];
+
+    for (let blockID = 0; blockID < Math.ceil(songsDB.length / BLOCK_SIZE); blockID++) {
         const promises = [];
-        for (let i = blockID * BLOCK_SIZE, j = 0; i < songsDB.length && j < BLOCK_SIZE; i++, j++) {
-            promises.push(uploadFirebase(songsDB[i].url));
-            //promises.push(downloadSong(songsDB[i].url));
+        const blockStart = blockID * BLOCK_SIZE;
+        const blockEnd = Math.min(songsDB.length, blockStart + BLOCK_SIZE);
+
+        for (let i = blockStart; i < blockEnd; i++) {
+            promises.push(uploadFirebase(`https://www.youtube.com/watch?v=${songsDB[i].id}`).catch((error) => error));
         }
 
-        for (let i = blockID * BLOCK_SIZE, j = 0; i < songsDB.length && j < BLOCK_SIZE; i++, j++) {
-            await promises[j];
+        for (let i = blockStart, j = 0; i < blockEnd; i++, j++) {
+            const result = await promises[j];
+            if (result instanceof Error || result === null) {
+                console.log(`Failed to download/upload song: ${songsDB[i].title} - ${songsDB[i].artist}. Blacklisting in blacklist.json.`);
+                const entry = {
+                    title: songsDB[i].title,
+                    artist: songsDB[i].artist,
+                    id: songsDB[i].id
+                };
+                if (!blacklist.some(s => s.title === entry.title && s.artist === entry.artist && s.id === entry.id)) {
+                    blacklist.push(entry);
+                    fs.writeFileSync('blacklist.json', JSON.stringify(blacklist, null, 2));
+                }
+            } else {
+                successfulSongs.push(songsDB[i]);
+            }
             if ((i + 1) % 100 === 0) {
                 console.log("Downloaded " + (i + 1) + " out of " + songsDB.length + " songs.")
             }
         }
     }
+
+    fs.writeFileSync('db.json', JSON.stringify(successfulSongs, null, 2));
 }
 
 await updateSongDB();
