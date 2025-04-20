@@ -32,6 +32,7 @@ function App() {
 	const [lobbyList, setLobbyList] = useState<LobbyMap>({});
 	const [songs, setSongs] = useState<{ title: string; artist: string; cover: string; url: string; }[]>([]);
 	const [correctSongIndex, setCorrectSongIndex] = useState<number>();
+	const [gameEnded, setGameEnded] = useState<boolean>(false);
 
 	const audioContextRef = useRef<AudioContext | null>(null);
 	const gainNodeRef = useRef<GainNode | null>(null);
@@ -55,7 +56,7 @@ function App() {
 	useEffect(() => {
 		audioContextRef.current = new AudioContext();
 		gainNodeRef.current = audioContextRef.current.createGain();
-		gainNodeRef.current.gain.value = 0.25;
+		gainNodeRef.current.gain.value = localStorage.getItem('volume') ? Number(localStorage.getItem('volume')) / 200 : 0.25;
 		gainNodeRef.current.connect(audioContextRef.current.destination);
 
 		const handleLobbyListChange = (lobbies: LobbyMap) => {
@@ -95,12 +96,13 @@ function App() {
 		});
 
 		socket.on('onGameStart', () => {
+			setGameEnded(false);
 			hostControlsRef.current?.classList.add('invisible');
 			timerRef.current?.classList.remove('hidden');
 			songPickerRef.current?.classList.remove('hidden');
 		});
 
-		socket.on('onRoundStart', async (allSongs, correctIndex, correctSongData, currentRounds, rounds) => {
+		socket.on('onRoundStart', async (allSongs, correctIndex, correctSongData, currentRounds, rounds, roundCurrentTimestamp) => {
 			if (sourceAudioBufferRef.current !== null) {
 				sourceAudioBufferRef.current.stop();
 				sourceAudioBufferRef.current = null;
@@ -138,11 +140,14 @@ function App() {
 					sourceAudioBufferRef.current = audioContextRef.current!.createBufferSource();
 					sourceAudioBufferRef.current.connect(gainNodeRef.current!);
 					sourceAudioBufferRef.current.buffer = buffer;
-					sourceAudioBufferRef.current.start();
+					const offsetSeconds = (Date.now() - roundCurrentTimestamp) / 1000;
+					sourceAudioBufferRef.current.start(0, offsetSeconds);
+					timerCountdown(roundCurrentTimestamp);
 				}, (err) => {
 					console.log("Playback error: " + err);
 				});
-			});			
+			});
+	
 		});
 
 		socket.on('onGameEnd', () => {
@@ -158,7 +163,11 @@ function App() {
 				mainScreenRef.current?.animate([{ paddingLeft: `${sidebarWidth}px` }, { paddingLeft: '0%' }], { duration: 400, easing: 'ease', fill: 'forwards' });
 				sidebarRef.current?.classList.remove('open');
 				sidebarRef.current?.animate([{ transform: 'translateX(0%)' }, { transform: 'translateX(calc(-100% + 66px))' }], { duration: 400, easing: 'ease', fill: 'forwards' });
-				sidebarRef.current?.children[0].animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, easing: 'ease', fill: 'forwards' });
+				sidebarRef.current?.children[0].animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, easing: 'ease', fill: 'forwards' }).finished.then(() => {
+					setGameEnded(true);
+					const roundNumber = document.getElementById('roundNumber') as HTMLElement;
+					roundNumber.innerHTML = "Round: - / -";
+				});
 			});
 			gameSummaryRef.current?.classList.remove('hidden');
 			gameSummaryRef.current?.animate([{ transform: 'translateY(100%)', opacity: 0 }, { transform: 'translateY(0%)', opacity: 1 }], { duration: 400, easing: 'ease', fill: 'forwards' });
@@ -180,12 +189,6 @@ function App() {
 			});
 		});
 
-		socket.on('timerChange', (timePassed) => {
-			if (timerRef.current) {
-				timerRef.current.innerHTML = `Time: ${Math.floor(timePassed)}.<small>${timePassed.toString().split('.')[1]}</small>s`;
-			}
-		});
-
 		return () => {
 			socket.off('onLobbyListChanged');
 			socket.off('onPlayersChanged');
@@ -194,6 +197,30 @@ function App() {
 			}
 		};
 	}, []);
+
+	const timerCountdown = (roundStartTimestamp: number) => {
+		if (!timerRef.current) return;
+		if ((window as any).bargeboTimerInterval) clearInterval((window as any).bargeboTimerInterval);
+	
+		function updateTimer() {
+			let elapsed = Date.now() - roundStartTimestamp;
+			if (elapsed < 0) elapsed = 0;
+			if (elapsed > 20000) elapsed = 20000;
+			const intPart = Math.floor(elapsed / 1000);
+			const decPart = Math.floor((elapsed % 1000) / 10)
+				.toString()
+				.padStart(2, '0');
+			timerRef.current!.innerHTML = `Time: ${intPart}.<small>${decPart}</small>s`;
+			if (elapsed >= 20000) {
+				timerRef.current!.innerHTML = `Time: 20s`;
+				clearInterval((window as any).bargeboTimerInterval);
+			}
+		}
+	
+		updateTimer();
+		(window as any).bargeboTimerInterval = setInterval(updateTimer, 10);
+		return () => clearInterval((window as any).bargeboTimerInterval);
+	};
 
 	const switchGameUI = () => {
 		const sidebarWidth = sidebarRef.current?.getBoundingClientRect().width;
@@ -220,7 +247,7 @@ function App() {
 		audioContextRef.current?.close();
 		audioContextRef.current = new AudioContext();
 		gainNodeRef.current = audioContextRef.current.createGain();
-		gainNodeRef.current.gain.value = 0.25;
+		gainNodeRef.current.gain.value = localStorage.getItem('volume') ? Number(localStorage.getItem('volume')) / 200 : 0.25;
 		gainNodeRef.current.connect(audioContextRef.current.destination);
 		if (sidebarRef.current?.classList.contains("open")) {
 			sidebarRef.current?.classList.remove("open");
@@ -264,7 +291,7 @@ function App() {
 	};
 
 	const submitAnswer = (choiceIndex: number) => {
-		socket.emit('submitAnswer', lobbyName, choiceIndex);
+		socket.emit('submitAnswer', choiceIndex);
 	};
 
 	const resetSongSelection = () => {
@@ -304,7 +331,7 @@ function App() {
 
 	return (
 		<div className="main">
-			<Sidebar players={lobbyPlayers} gainNodeRef={gainNodeRef} sidebarRef={sidebarRef} onLeaveLobby={onLeaveLobby} />
+			<Sidebar players={lobbyPlayers} gainNodeRef={gainNodeRef} sidebarRef={sidebarRef} gameEnded={gameEnded} yourUsername={username} onLeaveLobby={onLeaveLobby} />
 			<div className="main-screen" ref={mainScreenRef}>
 				<h1>BARGEBO GUESSER</h1>
 				<div className='start-screen-content' ref={startScreenContentRef}>
@@ -338,15 +365,15 @@ function App() {
 					) : null}
 					<ul id='lobbiesList'>
 						{Object.entries(lobbyList).map(([lobbyName, lobby]) => {
-							if (!lobby.players || lobby.roundStarted) return null;
+							if (!lobby.players) return null;
 							return (
 								<li key={lobbyName}>
 									<h2>{lobbyName}</h2>
 									<p>Players: {lobby.players.length}</p>
-									<p>Round: {lobby.currentRound} / {lobby.rounds}</p>
+									<p>Round: {lobby.currentRound == 0 ? "-" : lobby.currentRound} / {lobby.rounds == 0 ? "-" : lobby.rounds}</p>
 									<p>Status: {lobby.roundStarted ? "In Progress" : "Waiting"}</p>
 									<button className='join-lobby-button' onClick={() => joinLobby(lobbyName)} title={`Join ${lobbyName} lobby`}>
-										<svg stroke="var(--correct-color)" fill="var(--correct-color)" strokeWidth="0" viewBox="0 0 448 512" height="20px" width="20px" xmlns="http://www.w3.org/2000/svg"><path d="M424.4 214.7L72.4 6.6C43.8-10.3 0 6.1 0 47.9V464c0 37.5 40.7 60.1 72.4 41.3l352-208c31.4-18.5 31.5-64.1 0-82.6z"></path></svg>
+										<svg stroke="var(--correct-color)" fill="var(--correct-color)" strokeWidth="0" viewBox="0 0 448 512" height="30px" width="30px" xmlns="http://www.w3.org/2000/svg"><path d="M424.4 214.7L72.4 6.6C43.8-10.3 0 6.1 0 47.9V464c0 37.5 40.7 60.1 72.4 41.3l352-208c31.4-18.5 31.5-64.1 0-82.6z"></path></svg>
 									</button>
 								</li>
 							)

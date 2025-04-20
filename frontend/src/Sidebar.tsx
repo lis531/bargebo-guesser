@@ -11,12 +11,16 @@ interface Props {
     gainNodeRef: React.RefObject<GainNode | null>;
     sidebarRef: React.RefObject<HTMLDivElement | null>;
     onLeaveLobby: () => void;
+    gameEnded: boolean;
+    yourUsername: string;
 }
 
 function Sidebar(props: { players: Player[] } & Props) {
     const gainNodeRef = props.gainNodeRef;
     const sidebarRef = props.sidebarRef;
     const onLeaveLobby = props.onLeaveLobby;
+    let gameEnded = props.gameEnded;
+    const yourUsername = props.yourUsername;
     const { players } = props;
 
     const initialVolume = Number(localStorage.getItem('volume')) || 50;
@@ -83,15 +87,15 @@ function Sidebar(props: { players: Player[] } & Props) {
             <div className="sidebar" ref={sidebarRef}>
                 <div className="leaderboard">
                     <h2>Leaderboard</h2>
-                    <h3 id="roundNumber">Round: </h3>
+                    <h3 id="roundNumber">Round: - / -</h3>
                     <div className="leaderboard-players">
                         {players.map((player, index) => (
-                            <div key={index} className="leaderboard-player">
+                            <div key={index} className={`leaderboard-player ${player.username === yourUsername ? 'clients-player' : ''}`}>
                                 <span>
-                                    <p>{index + 1}</p>
+                                    <p>{index + 1}.</p>
                                     <p>{player.username}</p>
                                 </span>
-                                <p>{player.score}</p>
+                                <p>{gameEnded ? 0 : player.score}</p>
                             </div>
                         ))}
                     </div>

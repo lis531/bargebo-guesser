@@ -65,11 +65,10 @@ async function downloadFirebase(videoUrl) {
         const [exists] = await file.exists();
 
         if (exists) {
-            const [url] = await file.getSignedUrl({
+            await file.getSignedUrl({
                 action: 'read',
                 expires: '03-09-2030'
             });
-            console.log(`${url} already exists in Firebase Storage.`);
 
             const stream = file.createReadStream();
             const buffer = await streamToBuffer(stream);
@@ -103,9 +102,10 @@ async function announceRoundStart(lobbyName) {
     lobbies[lobbyName].roundStarted = true;
     lobbies[lobbyName].currentRound += 1;
     lobbies[lobbyName].firstAnswerPlayerId = '';
-    io.emit('onLobbyListChanged', lobbies);
+    lobbies[lobbyName].roundStartTimestamp = null;
+    io.emit('onLobbyListChanged', getPublicLobbies());
 
-    console.log("Selecting tracks...");
+    
     const selectedTracks = [];
     for (let i = 0; i < NUM_SONGS_TO_GUESS; i++) {
         const randomIndex = Math.floor(Math.random() * allSongs.length);
@@ -116,43 +116,25 @@ async function announceRoundStart(lobbyName) {
         }
         selectedTracks.push(allSongs[randomIndex]);
     }
-
-    console.log(selectedTracks);
+    console.log("Selected tracks: " + selectedTracks.map(track => track.title).join(", "));
 
     const correctIndex = Math.floor(Math.random() * selectedTracks.length);
     const correctVideoUrl = selectedTracks[correctIndex].url;
+    lobbies[lobbyName].selectedTracks = selectedTracks;
     lobbies[lobbyName].correctIndex = correctIndex;
 
     console.log("Fetching song from Firebase...");
 
     let correctSongData = await downloadFirebase(correctVideoUrl);
-    if (!correctSongData) {
-        const url = await uploadFirebase(correctVideoUrl);
-        if (url) {
-            correctSongData = await downloadFirebase(correctVideoUrl);
-        }
-    }
     console.log("Starting round " + lobbies[lobbyName].currentRound);
     setTimeout(() => {
-        io.to(lobbyName).emit('onRoundStart', selectedTracks, correctIndex, correctSongData, lobbies[lobbyName].currentRound, lobbies[lobbyName].rounds);
-
-        lobbies[lobbyName].timePassed = 0;
-
-        const timerInterval = setInterval(() => {
-            if (!lobbies[lobbyName]) {
-                clearInterval(timerInterval);
-                return;
-            }
-
-            lobbies[lobbyName].timePassed += 0.01;
-            io.to(lobbyName).emit('timerChange', lobbies[lobbyName].timePassed.toFixed(2));
-
-            if (lobbies[lobbyName].timePassed >= 20) {
-                announceRoundEnd(lobbyName);
-            }
-        }, 10);
-
-        lobbies[lobbyName].timerInterval = timerInterval;
+        if (!lobbies[lobbyName]) return;
+        lobbies[lobbyName].roundStartTimestamp = Date.now();
+        io.to(lobbyName).emit('onRoundStart', lobbies[lobbyName].selectedTracks, lobbies[lobbyName].correctIndex, correctSongData, lobbies[lobbyName].currentRound, lobbies[lobbyName].rounds, lobbies[lobbyName].roundStartTimestamp);
+        lobbies[lobbyName].answerTimeout = setTimeout(() => {
+            if (!lobbies[lobbyName]) return;
+            announceRoundEnd(lobbyName);
+        }, 20000);
     }, lobbies[lobbyName].currentRound == 1 ? 0 : 5000);
 }
 
@@ -162,7 +144,6 @@ async function announceRoundEnd(lobbyName) {
     }
 
     clearTimeout(lobbies[lobbyName].answerTimeout);
-    clearInterval(lobbies[lobbyName].timerInterval);
 
     lobbies[lobbyName].roundStarted = false;
 
@@ -175,9 +156,26 @@ async function announceRoundEnd(lobbyName) {
     }
 }
 
+function getPublicLobbies() {
+    const publicLobbies = {};
+    for (const [name, lobby] of Object.entries(lobbies)) {
+        publicLobbies[name] = {
+            players: lobby.players.map(p => ({
+                username: p.username,
+                score: p.score,
+                isHost: p.isHost
+            })),
+            roundStarted: lobby.roundStarted,
+            currentRound: lobby.currentRound,
+            rounds: lobby.rounds
+        };
+    }
+    return publicLobbies;
+}
+
 io.on('connection', (socket) => {
     console.log(`Client connected: ${socket.id}`);
-    socket.emit('onLobbyListChanged', lobbies);
+    socket.emit('onLobbyListChanged', getPublicLobbies());
 
     socket.on('createLobby', async (lobbyName, username) => {
         if (lobbies[lobbyName]) {
@@ -193,9 +191,9 @@ io.on('connection', (socket) => {
         };
         socket.join(lobbyName);
         socket.emit('createLobbyResponse', lobbyName, '');
-        io.emit('onLobbyListChanged', lobbies);
+        io.emit('onLobbyListChanged', getPublicLobbies());
         io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
-        console.log(`Lobby created: ${lobbyName}, by: ${username}`);
+        console.log(`Lobby ${lobbyName} created by ${username}`);
     });
 
     socket.on('joinLobby', async (lobbyName, username) => {
@@ -219,7 +217,15 @@ io.on('connection', (socket) => {
         socket.join(lobbyName);
         socket.emit('joinLobbyResponse', '');
         io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
-        console.log(`User ${username} joined lobby: ${lobbyName}`);
+        console.log(`User ${username} joined lobby ${lobbyName}`);
+
+        if (lobbies[lobbyName].roundStarted) {
+            const selectedTracks = lobbies[lobbyName].selectedTracks;
+            const correctIndex = lobbies[lobbyName].correctIndex;
+            const correctVideoUrl = selectedTracks[correctIndex].url;
+            const correctSongData = await downloadFirebase(correctVideoUrl);
+            socket.emit('onRoundStart', selectedTracks, correctIndex, correctSongData, lobbies[lobbyName].currentRound, lobbies[lobbyName].rounds, lobbies[lobbyName].roundStartTimestamp);
+        }
     });
 
     socket.on('announceGameStart', async (lobbyName, rounds) => {
@@ -229,8 +235,7 @@ io.on('connection', (socket) => {
         lobbies[lobbyName].roundStarted = false;
         lobbies[lobbyName].currentRound = 0;
         lobbies[lobbyName].firstAnswserPlayerId = '';
-        lobbies[lobbyName].timePassed = 0;
-        lobbies[lobbyName].timerInterval = null;
+        lobbies[lobbyName].roundStartTimestamp = null;
         for (const player of lobbies[lobbyName].players) {
             player.score = 0;
             console.log(player.username + " score: " + player.score);
@@ -244,60 +249,56 @@ io.on('connection', (socket) => {
         announceRoundStart(lobbyName);
     });
 
-    socket.on('submitAnswer', async (lobbyName, choiceIndex) => {
-        if (!lobbies[lobbyName] || !lobbies[lobbyName].roundStarted) {
-            if (!lobbies[lobbyName]) {
-                console.log(`Lobby ${lobbyName} does not exist.`);
-            } else {
-                console.log(`Lobby ${lobbyName} exists, roundStarted: ${lobbies[lobbyName].roundStarted}`);
-            }
-            console.log(`${socket.id} submitted answer too late or lobby doesn't exist.`);
+    socket.on('submitAnswer', async (choiceIndex) => {
+        const entry = Object.entries(lobbies)
+            .find(([_, lobby]) =>
+                lobby.players.some(p => p.id === socket.id)
+            );
+        if (!entry) {
+            console.log(`Socket ${socket.id} tried to answer but isn't in any lobby.`);
+            return;
+        }
+        const [lobbyName, lobby] = entry;
+
+        if (!lobby.roundStarted) {
+            console.log(`Lobby ${lobbyName} exists but round not started.`);
             return;
         }
 
-        for (const player of lobbies[lobbyName].players) {
+        for (const player of lobby.players) {
             if (player.id === socket.id) {
                 player.choice = choiceIndex;
-                if (choiceIndex == lobbies[lobbyName].correctIndex) {
-                    if (lobbies[lobbyName].firstAnswerPlayerId === '') {
-                        lobbies[lobbyName].firstAnswerPlayerId = socket.id;
+                console.log(`Player ${player.username} answered with ${choiceIndex}`);
+                if (choiceIndex === lobby.correctIndex) {
+                    if (!lobby.firstAnswerPlayerId) {
+                        lobby.firstAnswerPlayerId = socket.id;
                         player.score += 50;
                     }
-
-                    const maxScore = 500;
-                    const minScore = 80;
-                    const timeLimit = 20;
-                    const timePassed = lobbies[lobbyName].timePassed;
-
+                    const maxScore = 500, minScore = 80, timeLimit = 20;
+                    const timePassed = (Date.now() - lobby.roundStartTimestamp) / 1000;
                     if (timePassed <= 0.5) {
                         player.score += maxScore;
                     } else {
-                        const timeFactor = Math.exp(-2 * (timePassed / timeLimit));
-                        const score = minScore + (maxScore - minScore) * timeFactor;
-                        player.score += Math.round(score);
+                        const factor = Math.exp(-2 * (timePassed / timeLimit));
+                        player.score += Math.round(minScore + (maxScore - minScore) * factor);
                     }
                 }
-                io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
                 break;
             }
         }
 
-        for (const player of lobbies[lobbyName].players) {
-            if (player.choice === -1) {
-                console.log("Not all players submitted their answers.");
-                return;
-            }
-        }
+        io.to(lobbyName).emit('onPlayersChanged', lobby.players.sort((a, b) => b.score - a.score));
 
-        console.log("All players submitted their answers.");
-
-        const answerTimeout = setTimeout(() => {
-            if (lobbies[lobbyName]) {
+        const allAnswered = lobby.players.every(p => p.choice !== -1);
+        if (allAnswered) {
+            console.log(`All players in lobby ${lobbyName} answered, showing results...`);
+            if (lobby.answerTimeout) clearTimeout(lobby.answerTimeout);
+            lobby.answerTimeout = setTimeout(() => {
                 announceRoundEnd(lobbyName);
-            }
-        }, 5000);
-
-        lobbies[lobbyName].answerTimeout = answerTimeout;
+            }, 5000);
+        } else {
+            console.log(`Waiting on ${lobby.players.filter(p => p.choice === -1).length} players...`);
+        }
     });
 
     socket.on('disconnect', () => {
@@ -309,8 +310,9 @@ io.on('connection', (socket) => {
                 if (lobbies[lobby].answerTimeout) {
                     clearTimeout(lobbies[lobby].answerTimeout);
                 }
+                lobbies[lobby].answerTimeout = null;
                 delete lobbies[lobby];
-                io.emit('onLobbyListChanged', lobbies);
+                io.emit('onLobbyListChanged', getPublicLobbies());
             }
         }
     });
@@ -325,7 +327,7 @@ io.on('connection', (socket) => {
                 clearTimeout(lobbies[lobbyName].answerTimeout);
             }
             delete lobbies[lobbyName];
-            io.emit('onLobbyListChanged', lobbies);
+            io.emit('onLobbyListChanged', getPublicLobbies());
         }
     });
 
