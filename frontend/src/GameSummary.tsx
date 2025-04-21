@@ -8,9 +8,10 @@ interface Props {
     onLeaveLobby: () => void;
     onLobbyReturn: () => void;
     ref: React.RefObject<HTMLDivElement | null>;
+    hostInLobby: boolean;
 }
 
-function GameSummary({ players, onLeaveLobby, onLobbyReturn, ref }: Props) {
+function GameSummary({ players, onLeaveLobby, onLobbyReturn, ref, hostInLobby }: Props) {
     const leaveLobby = () => {
         onLeaveLobby();
     }
@@ -18,15 +19,13 @@ function GameSummary({ players, onLeaveLobby, onLobbyReturn, ref }: Props) {
     const returnToLobby = () => {
         onLobbyReturn();
     }
-
-    const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
-
+    
     return (
         <div className="hidden game-summary" ref={ref}>
             <h2>Game Summary</h2>
             <div className="game-summary-players">
                 <ol className='summary-list'>
-                    {sortedPlayers.map((player, index) => (
+                    {players.sort((a, b) => b.score - a.score).map((player, index) => (
                         <li key={index}>
                             <p>{player.username}</p><p>Score: {player.score}</p>
                         </li>
@@ -35,7 +34,7 @@ function GameSummary({ players, onLeaveLobby, onLobbyReturn, ref }: Props) {
             </div>
             <div>
                 <button onClick={leaveLobby}>Leave</button>
-                <button onClick={returnToLobby}>Return to lobby</button>
+                {hostInLobby ? <button onClick={returnToLobby}>Return to lobby</button> : null}
             </div>
         </div>
     )

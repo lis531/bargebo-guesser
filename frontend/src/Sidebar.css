@@ -122,6 +122,10 @@
             align-items: center;
             gap: 30px;
             margin-left: 20px;
+            & > p:last-child {
+                display: flex;
+                gap: 5px;
+            }
         }
     }
 }

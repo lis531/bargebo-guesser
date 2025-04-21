@@ -33,6 +33,9 @@ function App() {
 	const [songs, setSongs] = useState<{ title: string; artist: string; cover: string; url: string; }[]>([]);
 	const [correctSongIndex, setCorrectSongIndex] = useState<number>();
 	const [gameEnded, setGameEnded] = useState<boolean>(false);
+	const [host, setHost] = useState<string>("");
+	const [finalPlayers, setFinalPlayers] = useState<Player[]>([]);
+	const [lastConnectedLobby, setLastConnectedLobby] = useState<string>("");
 
 	const audioContextRef = useRef<AudioContext | null>(null);
 	const gainNodeRef = useRef<GainNode | null>(null);
@@ -64,7 +67,9 @@ function App() {
 		}
 
 		const handlePlayersChange = (players: any[]) => {
+			console.log("Players changed:", players);
 			setLobbyPlayers(players);
+			setHost(players.find((player: any) => player.isHost)?.username || "");
 		};
 
 		socket.on('onLobbyListChanged', handleLobbyListChange);
@@ -98,12 +103,10 @@ function App() {
 		socket.on('onGameStart', () => {
 			setGameEnded(false);
 			hostControlsRef.current?.classList.add('invisible');
-			timerRef.current?.classList.remove('hidden');
-			songPickerRef.current?.classList.remove('hidden');
 		});
 
 		socket.on('onRoundStart', async (allSongs, correctIndex, correctSongData, currentRounds, rounds, roundCurrentTimestamp) => {
-			if (sourceAudioBufferRef.current !== null) {
+			if (sourceAudioBufferRef.current) {
 				sourceAudioBufferRef.current.stop();
 				sourceAudioBufferRef.current = null;
 			}
@@ -140,7 +143,10 @@ function App() {
 					sourceAudioBufferRef.current = audioContextRef.current!.createBufferSource();
 					sourceAudioBufferRef.current.connect(gainNodeRef.current!);
 					sourceAudioBufferRef.current.buffer = buffer;
-					const offsetSeconds = (Date.now() - roundCurrentTimestamp) / 1000;
+					let offsetSeconds = (Date.now() - roundCurrentTimestamp) / 1000;
+					if (offsetSeconds < 0) {
+						offsetSeconds = 0;
+					}
 					sourceAudioBufferRef.current.start(0, offsetSeconds);
 					timerCountdown(roundCurrentTimestamp);
 				}, (err) => {
@@ -150,7 +156,7 @@ function App() {
 	
 		});
 
-		socket.on('onGameEnd', () => {
+		socket.on('onGameEnd', async (finalPlayers) => {
 			if (sourceAudioBufferRef.current) {
 				sourceAudioBufferRef.current.stop();
 				sourceAudioBufferRef.current = null;
@@ -169,6 +175,7 @@ function App() {
 					roundNumber.innerHTML = "Round: - / -";
 				});
 			});
+			setFinalPlayers(finalPlayers);
 			gameSummaryRef.current?.classList.remove('hidden');
 			gameSummaryRef.current?.animate([{ transform: 'translateY(100%)', opacity: 0 }, { transform: 'translateY(0%)', opacity: 1 }], { duration: 400, easing: 'ease', fill: 'forwards' });
 		});
@@ -190,8 +197,14 @@ function App() {
 		});
 
 		return () => {
-			socket.off('onLobbyListChanged');
-			socket.off('onPlayersChanged');
+			socket.off('onLobbyListChanged', handleLobbyListChange);
+			socket.off('onPlayersChanged', handlePlayersChange);
+			socket.off('createLobbyResponse');
+			socket.off('joinLobbyResponse');
+			socket.off('onGameStart');
+			socket.off('onRoundStart');
+			socket.off('onGameEnd');
+			socket.off('onRoundEnd');
 			if (audioContextRef.current) {
 				audioContextRef.current.close();
 			}
@@ -203,6 +216,8 @@ function App() {
 		if ((window as any).bargeboTimerInterval) clearInterval((window as any).bargeboTimerInterval);
 	
 		function updateTimer() {
+			if (!timerRef.current) return;
+			if (gameEnded) return;
 			let elapsed = Date.now() - roundStartTimestamp;
 			if (elapsed < 0) elapsed = 0;
 			if (elapsed > 20000) elapsed = 20000;
@@ -244,22 +259,20 @@ function App() {
 		hostControlsRef.current?.classList.add("invisible");
 		startScreenContentRef.current?.classList.remove("hidden");
 		lobbiesListRef.current?.classList.remove("hidden");
-		audioContextRef.current?.close();
-		audioContextRef.current = new AudioContext();
-		gainNodeRef.current = audioContextRef.current.createGain();
-		gainNodeRef.current.gain.value = localStorage.getItem('volume') ? Number(localStorage.getItem('volume')) / 200 : 0.25;
-		gainNodeRef.current.connect(audioContextRef.current.destination);
 		if (sidebarRef.current?.classList.contains("open")) {
 			sidebarRef.current?.classList.remove("open");
 			const sidebarWidth = sidebarRef.current?.getBoundingClientRect().width;
 			sidebarRef.current?.animate([{ transform: 'translateX(0%)' }, { transform: 'translateX(calc(-100% + 66px))' }], { duration: 400, easing: 'ease', fill: 'forwards' });
 			sidebarRef.current?.children[0].animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, easing: 'ease', fill: 'forwards' });
 			mainScreenRef.current?.animate([{ paddingLeft: `${sidebarWidth}px` }, { paddingLeft: '0%' }], { duration: 400, easing: 'ease', fill: 'forwards' });
+			startScreenContentRef.current?.animate([{ transform: 'translateY(30%)', opacity: 0 }, { transform: 'translateY(0%)', opacity: 1 }], { duration: 300, easing: 'ease', fill: 'forwards' });
+			lobbiesListRef.current?.animate([{ transform: 'translateY(30%)', opacity: 0 }, { transform: 'translateY(0%)', opacity: 1 }], { duration: 300, easing: 'ease', fill: 'forwards' });
 		}
 	};
 
 	const createLobby = () => {
 		if (lobbyName && username) {
+			setLastConnectedLobby(lobbyName);
 			socket.emit("createLobby", lobbyName, username);
 		} else {
 			ssfeedbackRef.current!.innerText = "Please enter a username and lobby name.";
@@ -268,9 +281,16 @@ function App() {
 
 	const joinLobby = (lobby = lobbyName) => {
 		if (lobby && username) {
+			setLastConnectedLobby(lobby);
 			socket.emit("joinLobby", lobby, username);
 		} else {
 			ssfeedbackRef.current!.innerText = "Please enter a username and lobby name.";
+		}
+	};
+
+	const reconnectLobby = (lobby = lobbyName) => {
+		if (lobby && username) {
+			socket.emit("reconnectLobby", lobby, username);
 		}
 	};
 
@@ -312,26 +332,36 @@ function App() {
 	};
 
 	const onLeaveLobby = () => {
-		socket.emit('leaveLobby', lobbyName);
+		socket.emit("leaveLobby");
 		setLobbyPlayers([]);
+		audioContextRef.current?.close();
+		audioContextRef.current = new AudioContext();
+		gainNodeRef.current = audioContextRef.current.createGain();
+		gainNodeRef.current.gain.value = localStorage.getItem('volume') ? Number(localStorage.getItem('volume')) / 200 : 0.25;
+		gainNodeRef.current.connect(audioContextRef.current.destination);
 		switchOnLeaveUI();
 	};
 
 	const onLobbyReturn = () => {
 		gameSummaryRef.current?.classList.add('hidden');
-		startScreenContentRef.current?.classList.remove("hidden");
-		lobbiesListRef.current?.classList.remove("hidden");
+		timerRef.current?.classList.add('invisible');
+		gameScreenContentRef.current?.classList.remove('hidden');
+		songPickerRef.current?.classList.add('invisible');
+		sidebarRef.current?.classList.add('open');
+		const sidebarWidth = sidebarRef.current?.getBoundingClientRect().width;
+		mainScreenRef.current?.animate([{ paddingLeft: '0%' }, { paddingLeft: `${sidebarWidth}px` }], { duration: 400, easing: 'ease', fill: 'forwards' });
+		sidebarRef.current?.animate([{ transform: 'translateX(calc(-100% + 66px))' }, { transform: 'translateX(0%)' }], { duration: 400, easing: 'ease', fill: 'forwards' });
+		sidebarRef.current?.children[0].animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, easing: 'ease', fill: 'forwards' });
 		if (lobbyPlayers.some(player => player.username === username && player.isHost)) {
 			hostControlsRef.current?.classList.remove("invisible");
-			timerRef.current?.classList.add('invisible');
-			songPickerRef.current?.classList.add('invisible');
+		} else {
+			reconnectLobby(lastConnectedLobby);
 		}
-		switchGameUI();
 	};
 
 	return (
 		<div className="main">
-			<Sidebar players={lobbyPlayers} gainNodeRef={gainNodeRef} sidebarRef={sidebarRef} gameEnded={gameEnded} yourUsername={username} onLeaveLobby={onLeaveLobby} />
+			<Sidebar players={lobbyPlayers} gainNodeRef={gainNodeRef} sidebarRef={sidebarRef} gameEnded={gameEnded} yourUsername={username} host={host} onLeaveLobby={onLeaveLobby} />
 			<div className="main-screen" ref={mainScreenRef}>
 				<h1>BARGEBO GUESSER</h1>
 				<div className='start-screen-content' ref={startScreenContentRef}>
@@ -381,7 +411,7 @@ function App() {
 					</ul>
 				</div>
 				<div className='game-screen-content hidden' ref={gameScreenContentRef}>
-					<h2 className='timer hidden' ref={timerRef}>Time: 0s</h2>
+					<h2 className='timer hidden invisible' ref={timerRef}>Time: 0s</h2>
 					<div className='host-controls invisible' ref={hostControlsRef}>
 						<div>
 							<label>Number of rounds:</label>
@@ -404,7 +434,7 @@ function App() {
 					</ol>
 				</div>
 				<SongPicker songs={songs} onSongSelect={onSongSelection} ref={songPickerRef} />
-				<GameSummary players={lobbyPlayers} onLeaveLobby={onLeaveLobby} onLobbyReturn={onLobbyReturn} ref={gameSummaryRef} />
+				<GameSummary players={finalPlayers} onLeaveLobby={switchOnLeaveUI} onLobbyReturn={onLobbyReturn} ref={gameSummaryRef} hostInLobby={host != ""} />
 				<footer>Borys Gajewski & Mateusz Antkiewicz @ 2025</footer>
 			</div>
 		</div>

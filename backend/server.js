@@ -152,7 +152,19 @@ async function announceRoundEnd(lobbyName) {
         announceRoundStart(lobbyName);
     } else {
         console.log("Game ended.");
-        io.to(lobbyName).emit('onGameEnd');
+        io.to(lobbyName).emit('onGameEnd', lobbies[lobbyName].players);
+        for (const player of lobbies[lobbyName].players) {
+            if (!player.isHost) {
+                const socketToKick = io.sockets.sockets.get(player.id);
+                if (socketToKick) {
+                    socketToKick.leave(lobbyName);
+                }
+            }
+        }
+        lobbies[lobbyName].players = lobbies[lobbyName].players.filter(player => player.isHost);
+        io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
+        io.emit('onLobbyListChanged', getPublicLobbies());
+        lobbies[lobbyName].players[0].score = 0;
     }
 }
 
@@ -171,6 +183,24 @@ function getPublicLobbies() {
         };
     }
     return publicLobbies;
+}
+
+function leaveLobby(socket){
+    for (const lobby in lobbies) {
+        lobbies[lobby].players = lobbies[lobby].players.filter(p => p.id !== socket.id);
+        const socketToKick = io.sockets.sockets.get(socket.id);
+        if (socketToKick) {
+            socketToKick.leave(lobby);
+        }
+        console.log(`Client disconnected: ${socket.id}`);
+        if (lobbies[lobby].players.length === 0) {
+            delete lobbies[lobby];
+            console.log(`Lobby ${lobby} deleted`);
+        } else {
+            io.to(lobby).emit('onPlayersChanged', lobbies[lobby].players.sort((a, b) => b.score - a.score));
+            io.emit('onLobbyListChanged', getPublicLobbies());
+        }
+    }
 }
 
 io.on('connection', (socket) => {
@@ -227,6 +257,14 @@ io.on('connection', (socket) => {
             socket.emit('onRoundStart', selectedTracks, correctIndex, correctSongData, lobbies[lobbyName].currentRound, lobbies[lobbyName].rounds, lobbies[lobbyName].roundStartTimestamp);
         }
     });
+
+    socket.on('reconnectLobby', async (lobbyName, username) => {
+        lobbies[lobbyName].players.push({ id: socket.id, username: username, choice: -1, score: 0 });
+        socket.join(lobbyName);
+        io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
+        console.log(`User ${username} joined lobby ${lobbyName}`);
+    });
+
 
     socket.on('announceGameStart', async (lobbyName, rounds) => {
         if (!lobbies[lobbyName]) return;
@@ -302,35 +340,12 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        for (const lobby in lobbies) {
-            lobbies[lobby].players = lobbies[lobby].players.filter(p => p.id !== socket.id);
-            console.log(`Client disconnected: ${socket.id}`);
-            io.to(lobby).emit('onPlayersChanged', lobbies[lobby].players.sort((a, b) => b.score - a.score));
-            if (lobbies[lobby].players.length === 0) {
-                if (lobbies[lobby].answerTimeout) {
-                    clearTimeout(lobbies[lobby].answerTimeout);
-                }
-                lobbies[lobby].answerTimeout = null;
-                delete lobbies[lobby];
-                io.emit('onLobbyListChanged', getPublicLobbies());
-            }
-        }
+        leaveLobby(socket);
     });
 
-    socket.on('leaveLobby', (lobbyName) => {
-        if (!lobbies[lobbyName]) return;
-        lobbies[lobbyName].players = lobbies[lobbyName].players.filter(p => p.id !== socket.id);
-        socket.leave(lobbyName);
-        io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
-        if (lobbies[lobbyName].players.length === 0) {
-            if (lobbies[lobbyName].answerTimeout) {
-                clearTimeout(lobbies[lobbyName].answerTimeout);
-            }
-            delete lobbies[lobbyName];
-            io.emit('onLobbyListChanged', getPublicLobbies());
-        }
+    socket.on('leaveLobby', () => {
+        leaveLobby(socket);
     });
-
 });
 
 server.listen(PORT, () => {
