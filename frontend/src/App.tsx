@@ -72,6 +72,17 @@ function App() {
 
 		const handlePlayersChange = (players: Player[]) => {
 			setLobbyPlayers(players);
+			if (lobbyPlayersRef.current.length > players.length) {
+				const leftPlayer = lobbyPlayersRef.current.find(player => !players.some(p => p.id === player.id));
+				if (leftPlayer) {
+					setPreviousPlayers(prev => prev.filter(p => p.id !== leftPlayer.id));
+				}
+			} else if (lobbyPlayersRef.current.length < players.length) {
+				const newPlayer = players.find(player => !lobbyPlayersRef.current.some(p => p.id === player.id));
+				if (newPlayer) {
+					setPreviousPlayers(prev => [...prev, newPlayer]);
+				}
+			}
 			setHost(players.find((player: Player) => player.isHost)?.username || "");
 		};
 
@@ -145,12 +156,12 @@ function App() {
 					sourceAudioBufferRef.current = audioContextRef.current!.createBufferSource();
 					sourceAudioBufferRef.current.connect(gainNodeRef.current!);
 					sourceAudioBufferRef.current.buffer = buffer;
-					let offsetSeconds = (Date.now() - roundCurrentTimestamp) / 1000;
+					let offsetSeconds = (Date.now() - serverClientTimeOffset - roundCurrentTimestamp) / 1000;
 					if (offsetSeconds < 0) {
 						offsetSeconds = 0;
 					}
 					sourceAudioBufferRef.current.start(0, offsetSeconds);
-					timerCountdown(roundCurrentTimestamp);
+					timerCountdown(roundCurrentTimestamp, serverClientTimeOffset);
 				}, (err) => {
 					console.log("Playback error: " + err);
 				});
@@ -198,6 +209,13 @@ function App() {
 			});
 		});
 
+		let serverClientTimeOffset = 0;
+
+		socket.on('pingForOffset', (serverTime: number) => {
+			const clientNow = Date.now();
+			serverClientTimeOffset = clientNow - serverTime;
+		});
+
 		return () => {
 			socket.off('onLobbyListChanged', handleLobbyListChange);
 			socket.off('onPlayersChanged', handlePlayersChange);
@@ -221,23 +239,23 @@ function App() {
 		previousPlayersRef.current = previousPlayers;
 	}, [previousPlayers]);
 
-	const timerCountdown = (roundStartTimestamp: number) => {
+	const timerCountdown = (roundStartTimestamp: number, serverClientTimeOffset: number) => {
 		if (!timerRef.current) return;
 		if ((window as any).bargeboTimerInterval) clearInterval((window as any).bargeboTimerInterval);
 
 		function updateTimer() {
-			if (!timerRef.current) return;
-			if (gameEnded) return;
-			let elapsed = Date.now() - roundStartTimestamp;
+			if (!timerRef.current || gameEnded) return;
+
+			let elapsed = Date.now() - serverClientTimeOffset - roundStartTimestamp;
 			if (elapsed < 0) elapsed = 0;
 			if (elapsed > 20000) elapsed = 20000;
+
 			const intPart = Math.floor(elapsed / 1000);
-			const decPart = Math.floor((elapsed % 1000) / 10)
-				.toString()
-				.padStart(2, '0');
-			timerRef.current!.innerHTML = `Time: ${intPart}.<small>${decPart}</small>s`;
+			const decPart = Math.floor((elapsed % 1000) / 10).toString().padStart(2, '0');
+			timerRef.current.innerHTML = `Time: ${intPart}.<small>${decPart}</small>s`;
+
 			if (elapsed >= 20000) {
-				timerRef.current!.innerHTML = `Time: 20s`;
+				timerRef.current.innerHTML = `Time: 20s`;
 				clearInterval((window as any).bargeboTimerInterval);
 			}
 		}
@@ -259,6 +277,9 @@ function App() {
 	};
 
 	const switchOnLeaveUI = () => {
+		if (lobbyPlayers.some(player => player.username === username && player.isHost)) {
+			socket.emit("leaveLobby");
+		}
 		gameSummaryRef.current?.classList.add("hidden");
 		roundSummaryRef.current?.classList.add("hidden");
 		songPickerRef.current?.classList.add("invisible");
@@ -484,7 +505,7 @@ function App() {
 					</ol>
 				</div>
 				<SongPicker songs={songs} onSongSelect={onSongSelection} ref={songPickerRef} />
-				<GameSummary players={finalPlayers} onLeaveLobby={switchOnLeaveUI} onLobbyReturn={onLobbyReturn} ref={gameSummaryRef} hostInLobby={host != ""} />
+				<GameSummary players={finalPlayers} onLeaveLobby={switchOnLeaveUI} onLobbyReturn={onLobbyReturn} ref={gameSummaryRef} lobbyStillExists={Object.keys(lobbyList).some(lobby => lobby === lastConnectedLobby) ? true : false} />
 				<footer>Borys Gajewski & Mateusz Antkiewicz @ 2025</footer>
 			</div>
 		</div>

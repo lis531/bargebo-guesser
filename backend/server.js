@@ -86,7 +86,7 @@ async function downloadFirebase(videoUrl) {
 
 const lobbies = {};
 
-const allSongs = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'db.json'), 'utf8'));
+const allSongs = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'songDB.json'), 'utf8'));
 for (let i = 0; i < allSongs.length; i++) {
     allSongs[i].cover = `https://img.youtube.com/vi/${allSongs[i].id}/0.jpg`;
     allSongs[i].url = `https://www.youtube.com/watch?v=${allSongs[i].id}`;
@@ -365,7 +365,9 @@ io.on('connection', (socket) => {
     socket.on('leaveLobby', () => {
         leaveLobby(socket);
     });
-});
+
+    socket.emit('pingForOffset', Date.now());
+});  
 
 server.listen(PORT, () => {
     console.log('Server running on port:' + PORT);

@@ -64,15 +64,15 @@ async function fetchTracks() {
 async function updateSongDB() {
     let existingSongs = [];
     let blacklist = [];
-    if (fs.existsSync('db.json')) {
+    if (fs.existsSync('songDB.json')) {
         try {
-            const fileContent = fs.readFileSync('db.json', 'utf8');
+            const fileContent = fs.readFileSync('songDB.json', 'utf8');
             if (fileContent && fileContent.trim() !== '') {
                 existingSongs = JSON.parse(fileContent);
-                console.log(`Loaded ${existingSongs.length} existing songs from db.json`);
+                console.log(`Loaded ${existingSongs.length} existing songs from songDB.json`);
             }
         } catch (err) {
-            console.error(`Error reading existing db.json: ${err.message}`);
+            console.error(`Error reading existing songDB.json: ${err.message}`);
         }
     }
     if (fs.existsSync('blacklist.json')) {
@@ -143,7 +143,7 @@ async function updateSongDB() {
 
     const allSongs = [...existingSongs, ...uniqueNewSongs];
 
-    fs.writeFile('db.json', JSON.stringify(allSongs, null, 2), (err) => {
+    fs.writeFile('songDB.json', JSON.stringify(allSongs, null, 2), (err) => {
         if (err) {
             console.error('Error writing file:', err);
         } else {
@@ -282,7 +282,8 @@ async function downloadSongsDB(songsDB) {
         }
     }
 
-    fs.writeFileSync('db.json', JSON.stringify(successfulSongs, null, 2));
+    const allSongs = [...songsDB, ...successfulSongs];
+    fs.writeFileSync('songDB.json', JSON.stringify(allSongs, null, 2));
 }
 
 await updateSongDB();

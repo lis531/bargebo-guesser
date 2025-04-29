@@ -8,10 +8,10 @@ interface Props {
     onLeaveLobby: () => void;
     onLobbyReturn: () => void;
     ref: React.RefObject<HTMLDivElement | null>;
-    hostInLobby: boolean;
+    lobbyStillExists: boolean;
 }
 
-function GameSummary({ players, onLeaveLobby, onLobbyReturn, ref, hostInLobby }: Props) {
+function GameSummary({ players, onLeaveLobby, onLobbyReturn, ref, lobbyStillExists }: Props) {
     const leaveLobby = () => {
         onLeaveLobby();
     }
@@ -19,7 +19,7 @@ function GameSummary({ players, onLeaveLobby, onLobbyReturn, ref, hostInLobby }:
     const returnToLobby = () => {
         onLobbyReturn();
     }
-    
+
     return (
         <div className="hidden game-summary" ref={ref}>
             <h2>Game Summary</h2>
@@ -34,7 +34,7 @@ function GameSummary({ players, onLeaveLobby, onLobbyReturn, ref, hostInLobby }:
             </div>
             <div>
                 <button onClick={leaveLobby}>Leave</button>
-                {hostInLobby ? <button onClick={returnToLobby}>Return to lobby</button> : null}
+                {lobbyStillExists ? <button onClick={returnToLobby}>Return to lobby</button> : null}
             </div>
         </div>
     )
