@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import './App.css';
 import SongPicker from './SongPicker.tsx';
 import Sidebar from './Sidebar.tsx';
@@ -8,27 +8,28 @@ import { io } from "socket.io-client";
 // const socket = io("http://localhost:2137/");
 const socket = io("https://bargebo-00fc4919d1db.herokuapp.com/");
 
+type Player = {
+	id: string;
+	username: string;
+	choice: number;
+	score: number;
+	isHost?: boolean;
+};
+
+type Lobby = {
+	players: Player[];
+	roundStarted: boolean;
+	currentRound: number;
+	rounds: number;
+};
+
+type LobbyMap = Record<string, Lobby>;
+
 function App() {
-	type Player = {
-		id: string;
-		username: string;
-		choice: number;
-		score: number;
-		isHost?: boolean;
-	};
-
-	type Lobby = {
-		players: Player[];
-		roundStarted: boolean;
-		currentRound: number;
-		rounds: number;
-	};
-
-	type LobbyMap = Record<string, Lobby>;
-
 	const [lobbyName, setLobbyName] = useState<string>("");
 	const [username, setUsername] = useState<string>("");
-	const [lobbyPlayers, setLobbyPlayers] = useState<any[]>([]);
+	const [lobbyPlayers, setLobbyPlayers] = useState<Player[]>([]);
+	const [previousPlayers, setPreviousPlayers] = useState<Player[]>([]);
 	const [lobbyList, setLobbyList] = useState<LobbyMap>({});
 	const [songs, setSongs] = useState<{ title: string; artist: string; cover: string; url: string; }[]>([]);
 	const [correctSongIndex, setCorrectSongIndex] = useState<number>();
@@ -53,6 +54,9 @@ function App() {
 	const ssfeedbackRef = useRef<HTMLParagraphElement>(null);
 	const gsfeedbackRef = useRef<HTMLParagraphElement>(null);
 	const roundSummaryRef = useRef<HTMLDivElement>(null);
+	const summaryListRef = useRef<HTMLOListElement>(null);
+	const lobbyPlayersRef = useRef<Player[]>([]);
+	const previousPlayersRef = useRef<Player[]>([]);
 
 	// const [isDevMode, _] = useState<boolean>(localStorage.getItem('devMode') === 'true');
 
@@ -66,18 +70,13 @@ function App() {
 			setLobbyList(lobbies);
 		}
 
-		const handlePlayersChange = (players: any[]) => {
-			console.log("Players changed:", players);
+		const handlePlayersChange = (players: Player[]) => {
 			setLobbyPlayers(players);
-			setHost(players.find((player: any) => player.isHost)?.username || "");
+			setHost(players.find((player: Player) => player.isHost)?.username || "");
 		};
 
 		socket.on('onLobbyListChanged', handleLobbyListChange);
 		socket.on('onPlayersChanged', handlePlayersChange);
-
-		socket.on('onPlayersChanged', (players) => {
-			setLobbyPlayers(players);
-		});
 
 		socket.on("createLobbyResponse", (_, err) => {
 			if (err !== '') {
@@ -106,6 +105,9 @@ function App() {
 		});
 
 		socket.on('onRoundStart', async (allSongs, correctIndex, correctSongData, currentRounds, rounds, roundCurrentTimestamp) => {
+			if (!previousPlayersRef.current.length) {
+				setPreviousPlayers(lobbyPlayersRef.current);
+			}
 			if (sourceAudioBufferRef.current) {
 				sourceAudioBufferRef.current.stop();
 				sourceAudioBufferRef.current = null;
@@ -153,7 +155,6 @@ function App() {
 					console.log("Playback error: " + err);
 				});
 			});
-	
 		});
 
 		socket.on('onGameEnd', async (finalPlayers) => {
@@ -191,8 +192,9 @@ function App() {
 			gameScreenContentRef.current?.animate([{ transform: 'translateY(0%)', opacity: 1 }, { transform: 'translateY(100%)', opacity: 0 }], { duration: 300, easing: 'ease', fill: 'forwards' }).finished.then(() => {
 				gameScreenContentRef.current?.classList.add('hidden');
 				roundSummaryRef.current?.classList.remove('hidden');
-				roundSummaryRef.current?.animate([{ transform: 'translateY(100%)', opacity: 0 }, { transform: 'translateY(0%)', opacity: 1 }], { duration: 400, easing: 'ease', fill: 'forwards' });
-				socket.emit('announceRoundStart', lobbyName);
+				roundSummaryRef.current?.animate([{ transform: 'translateY(100%)', opacity: 0 }, { transform: 'translateY(0)', opacity: 1 }], { duration: 400, easing: 'ease', fill: 'forwards' }).finished.then(() => {
+					animatePlayerMoves();
+				});
 			});
 		});
 
@@ -211,10 +213,18 @@ function App() {
 		};
 	}, []);
 
+	useEffect(() => {
+		lobbyPlayersRef.current = lobbyPlayers;
+	}, [lobbyPlayers]);
+
+	useEffect(() => {
+		previousPlayersRef.current = previousPlayers;
+	}, [previousPlayers]);
+
 	const timerCountdown = (roundStartTimestamp: number) => {
 		if (!timerRef.current) return;
 		if ((window as any).bargeboTimerInterval) clearInterval((window as any).bargeboTimerInterval);
-	
+
 		function updateTimer() {
 			if (!timerRef.current) return;
 			if (gameEnded) return;
@@ -231,7 +241,7 @@ function App() {
 				clearInterval((window as any).bargeboTimerInterval);
 			}
 		}
-	
+
 		updateTimer();
 		(window as any).bargeboTimerInterval = setInterval(updateTimer, 10);
 		return () => clearInterval((window as any).bargeboTimerInterval);
@@ -359,6 +369,46 @@ function App() {
 		}
 	};
 
+	const animatePlayerMoves = () => {
+		lobbyPlayersRef.current.map((player, index) => {
+			const prevPlayerIndex = previousPlayersRef.current.findIndex(prevPlayer => prevPlayer.id === player.id);
+			if (prevPlayerIndex !== -1) {
+				const diffPosition = prevPlayerIndex - index;
+				const playersList = summaryListRef.current!.children as HTMLCollectionOf<HTMLOListElement>;
+				const liHeight = 73;
+				const newPlayerPosition = diffPosition * liHeight;
+				playersList[index].style.transition = "transform 1s ease-in-out, color 1s ease-in-out";
+				playersList[index].style.transform = `translateY(${newPlayerPosition}px)`;
+				const prevScore = previousPlayersRef.current[prevPlayerIndex]?.score ?? 0;
+				const newScore = player.score;
+				if (newScore > prevScore) {
+					const scoreElem = playersList[prevPlayerIndex].querySelector("p:nth-child(2)") as HTMLParagraphElement;
+					const start = performance.now(), duration = 500, diffScore = newScore - prevScore;
+
+					requestAnimationFrame(function animate(t) {
+						const progress = Math.min((t - start) / duration, 1);
+						scoreElem.textContent = "Score: " + Math.floor(prevScore + diffScore * progress).toString();
+						if (progress < 1) requestAnimationFrame(animate);
+					});
+				}
+				if (diffPosition === 0) {
+					setTimeout(() => {
+						setPreviousPlayers(lobbyPlayersRef.current);
+					}, 1500);
+					return;
+				}
+				playersList[index].style.color = diffPosition < 0 ? "var(--correct-color)" : "var(--incorrect-color)";
+				setTimeout(() => {
+					playersList[index].style.transition = "none";
+					playersList[index].style.transform = `translateY(0px)`;
+					playersList[index].style.color = "var(--text-color)";
+					console.log(lobbyPlayersRef.current);
+					setPreviousPlayers(lobbyPlayersRef.current);
+				}, 1500);
+			}
+		});
+	};
+
 	return (
 		<div className="main">
 			<Sidebar players={lobbyPlayers} gainNodeRef={gainNodeRef} sidebarRef={sidebarRef} gameEnded={gameEnded} yourUsername={username} host={host} onLeaveLobby={onLeaveLobby} />
@@ -425,8 +475,8 @@ function App() {
 					{correctSongIndex !== undefined && songs[correctSongIndex] ? (
 						<h3>Correct Song: {songs[correctSongIndex].title} - {songs[correctSongIndex].artist}</h3>
 					) : null}
-					<ol className='summary-list'>
-						{lobbyPlayers.map((player) => (
+					<ol className='summary-list' ref={summaryListRef}>
+						{previousPlayers.map(player => (
 							<li key={player.id}>
 								<p>{player.username}</p><p>Score: {player.score}</p>
 							</li>

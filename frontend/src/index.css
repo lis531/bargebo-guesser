@@ -17,7 +17,7 @@
     --button-background-color: #1a1a1a;
     --additional-color: #1a1a1a;
     --button-hover-color: #646cff;
-    --error-color: #e25d68;
+    --incorrect-color: #e25d68;
     --correct-color: #00ff00;
 
     font-family: 'DM Sans';
@@ -110,7 +110,7 @@ dialog {
 }
 
 .error {
-    color: var(--error-color);
+    color: var(--incorrect-color);
     margin: 0.5em 0;
     height: 24px;
 }

@@ -55,7 +55,6 @@
     }
 
     &.disabled:not(.selected) {
-        color: red;
         opacity: 0.5;
         cursor: not-allowed;
     }
@@ -64,10 +63,10 @@
         background-color: #ffffff;
     }
     &.correct {
-        background-color: #42e042;
+        background-color: var(--correct-color);
     }
     &.incorrect {
-        background-color: #df4754;
+        background-color: var(--incorrect-color);
     }
 }
 

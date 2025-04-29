@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import './Sidebar.css';
 
-interface Player {
-    id: number;
+type Player = {
+    id: string;
     username: string;
+    choice: number;
     score: number;
-}
+    isHost?: boolean;
+};
 
 interface Props {
     gainNodeRef: React.RefObject<GainNode | null>;

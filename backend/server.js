@@ -105,7 +105,7 @@ async function announceRoundStart(lobbyName) {
     lobbies[lobbyName].roundStartTimestamp = null;
     io.emit('onLobbyListChanged', getPublicLobbies());
 
-    
+
     const selectedTracks = [];
     for (let i = 0; i < NUM_SONGS_TO_GUESS; i++) {
         const randomIndex = Math.floor(Math.random() * allSongs.length);
@@ -126,16 +126,21 @@ async function announceRoundStart(lobbyName) {
     console.log("Fetching song from Firebase...");
 
     let correctSongData = await downloadFirebase(correctVideoUrl);
+    if (!correctSongData) {
+        console.error("Failed to start round: Song data missing.");
+        return;
+    }
     console.log("Starting round " + lobbies[lobbyName].currentRound);
     setTimeout(() => {
         if (!lobbies[lobbyName]) return;
         lobbies[lobbyName].roundStartTimestamp = Date.now();
+        lobbies[lobbyName].correctSongData = correctSongData;
         io.to(lobbyName).emit('onRoundStart', lobbies[lobbyName].selectedTracks, lobbies[lobbyName].correctIndex, correctSongData, lobbies[lobbyName].currentRound, lobbies[lobbyName].rounds, lobbies[lobbyName].roundStartTimestamp);
         lobbies[lobbyName].answerTimeout = setTimeout(() => {
             if (!lobbies[lobbyName]) return;
             announceRoundEnd(lobbyName);
         }, 20000);
-    }, lobbies[lobbyName].currentRound == 1 ? 0 : 5000);
+    }, lobbies[lobbyName].currentRound == 1 ? 0 : 3500);
 }
 
 async function announceRoundEnd(lobbyName) {
@@ -185,7 +190,7 @@ function getPublicLobbies() {
     return publicLobbies;
 }
 
-function leaveLobby(socket){
+function leaveLobby(socket) {
     for (const lobby in lobbies) {
         lobbies[lobby].players = lobbies[lobby].players.filter(p => p.id !== socket.id);
         const socketToKick = io.sockets.sockets.get(socket.id);
@@ -194,12 +199,16 @@ function leaveLobby(socket){
         }
         console.log(`Client disconnected: ${socket.id}`);
         if (lobbies[lobby].players.length === 0) {
+            clearTimeout(lobbies[lobby].answerTimeout);
             delete lobbies[lobby];
             console.log(`Lobby ${lobby} deleted`);
         } else {
+            if (lobbies[lobby].players.length > 0) {
+                lobbies[lobby].players[0].isHost = true;
+            }
             io.to(lobby).emit('onPlayersChanged', lobbies[lobby].players.sort((a, b) => b.score - a.score));
-            io.emit('onLobbyListChanged', getPublicLobbies());
         }
+        io.emit('onLobbyListChanged', getPublicLobbies());
     }
 }
 
@@ -246,15 +255,13 @@ io.on('connection', (socket) => {
         lobbies[lobbyName].players.push({ id: socket.id, username: username, choice: -1, score: 0 });
         socket.join(lobbyName);
         socket.emit('joinLobbyResponse', '');
+        io.emit('onLobbyListChanged', getPublicLobbies());
         io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
         console.log(`User ${username} joined lobby ${lobbyName}`);
 
         if (lobbies[lobbyName].roundStarted) {
-            const selectedTracks = lobbies[lobbyName].selectedTracks;
-            const correctIndex = lobbies[lobbyName].correctIndex;
-            const correctVideoUrl = selectedTracks[correctIndex].url;
-            const correctSongData = await downloadFirebase(correctVideoUrl);
-            socket.emit('onRoundStart', selectedTracks, correctIndex, correctSongData, lobbies[lobbyName].currentRound, lobbies[lobbyName].rounds, lobbies[lobbyName].roundStartTimestamp);
+            const { selectedTracks, correctIndex, correctSongData, currentRound, rounds, roundStartTimestamp } = lobbies[lobbyName];
+            socket.emit('onRoundStart', selectedTracks, correctIndex, correctSongData, currentRound, rounds, roundStartTimestamp);
         }
     });
 
@@ -268,7 +275,15 @@ io.on('connection', (socket) => {
 
     socket.on('announceGameStart', async (lobbyName, rounds) => {
         if (!lobbies[lobbyName]) return;
-        if (lobbies[lobbyName].players.id == socket.id && !lobbies[lobbyName].players.isHost) return;
+        const host = lobbies[lobbyName].players.find(player => player.id === socket.id);
+        if (!host || !host.isHost) {
+            socket.emit('onGameStartResponse', 'You are not the host!');
+            return;
+        }
+        if (rounds < 1 || rounds > 30) {
+            socket.emit('onGameStartResponse', 'Invalid number of rounds!');
+            return;
+        }
         lobbies[lobbyName].rounds = rounds;
         lobbies[lobbyName].roundStarted = false;
         lobbies[lobbyName].currentRound = 0;
@@ -288,6 +303,10 @@ io.on('connection', (socket) => {
     });
 
     socket.on('submitAnswer', async (choiceIndex) => {
+        if (choiceIndex < 0 || choiceIndex > 3) {
+            console.log(`Invalid choice index: ${choiceIndex}`);
+            return;
+        }
         const entry = Object.entries(lobbies)
             .find(([_, lobby]) =>
                 lobby.players.some(p => p.id === socket.id)
