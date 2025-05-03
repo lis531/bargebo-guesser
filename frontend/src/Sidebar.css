@@ -89,6 +89,9 @@
         border: 2px solid rgb(127 127 127 / 50%);
         border-radius: 10px;
         width: min-content;
+        & > .inline-form-group {
+            justify-content: space-between;
+        }
         h2 {
             margin-top: 0;
             margin-bottom: 25px;
@@ -108,6 +111,9 @@
     padding: 10px;
     .clients-player {
         background-color: var(--additional-color);
+    }
+    .leaderboard-player:first-child {
+        border-radius: 8px 8px 0 0;
     }
     .leaderboard-player {
         display: flex;

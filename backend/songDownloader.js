@@ -143,14 +143,6 @@ async function updateSongDB() {
 
     const allSongs = [...existingSongs, ...uniqueNewSongs];
 
-    fs.writeFile('songDB.json', JSON.stringify(allSongs, null, 2), (err) => {
-        if (err) {
-            console.error('Error writing file:', err);
-        } else {
-            console.log(`File written successfully with ${allSongs.length} total songs!`);
-        }
-    });
-
     if (DOWNLOAD_ONLY_NEW) {
         await downloadSongsDB(uniqueNewSongs);
     } else {
@@ -168,7 +160,7 @@ async function downloadSong(videoUrl) {
     }
 
     return new Promise((resolve, reject) => {
-        exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:20" --force-overwrites --audio-format mp3 --postprocessor-args "ffmpeg:-filter:a dynaudnorm" -o "${`audio/${videoID}.mp3`}" ${videoUrl}`, async (error) => {
+        exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:30" --force-overwrites --audio-format mp3 --postprocessor-args "ffmpeg:-filter:a dynaudnorm" -o "${`audio/${videoID}.mp3`}" ${videoUrl}`, async (error) => {
             if (error) {
                 console.error(`Error downloading track: ${error.message}`);
                 reject(error);
@@ -197,7 +189,7 @@ async function uploadFirebase(videoUrl) {
         }
 
         return await new Promise((resolve, reject) => {
-            exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:20" --force-overwrites --audio-format mp3 --postprocessor-args "ffmpeg:-filter:a dynaudnorm" -o "${filePath}" ${videoUrl}`, async (error) => {
+            exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:30" --force-overwrites --audio-format mp3 --postprocessor-args "ffmpeg:-filter:a dynaudnorm" -o "${filePath}" ${videoUrl}`, async (error) => {
                 if (error) {
                     console.error(`Error downloading track: ${error.message}`);
                     reject(error);
@@ -282,8 +274,16 @@ async function downloadSongsDB(songsDB) {
         }
     }
 
-    const allSongs = [...songsDB, ...successfulSongs];
-    fs.writeFileSync('songDB.json', JSON.stringify(allSongs, null, 2));
+    const previousSongs = fs.existsSync('songDB.json') ? JSON.parse(fs.readFileSync('songDB.json', 'utf8')) : [];
+    const allSongs = [...successfulSongs, ...previousSongs];
+
+    fs.writeFile('songDB.json', JSON.stringify(allSongs, null, 2), (err) => {
+        if (err) {
+            console.error('Error writing file:', err);
+        } else {
+            console.log(`File written successfully with ${allSongs.length} total songs!`);
+        }
+    });
 }
 
 await updateSongDB();

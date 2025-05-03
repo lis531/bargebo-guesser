@@ -16,6 +16,8 @@ interface Props {
     gameEnded: boolean;
     yourUsername: string;
     host: string;
+    gameMode: string;
+    minScore: number;
 }
 
 function Sidebar(props: { players: Player[] } & Props) {
@@ -25,6 +27,8 @@ function Sidebar(props: { players: Player[] } & Props) {
     let gameEnded = props.gameEnded;
     const yourUsername = props.yourUsername;
     const host = props.host;
+    const gameMode = props.gameMode;
+    const minScore = props.minScore;
     const { players } = props;
 
     const initialVolume = Number(localStorage.getItem('volume')) || 50;
@@ -74,23 +78,28 @@ function Sidebar(props: { players: Player[] } & Props) {
             <dialog className='settings-dialog' onClick={(e) => closeSettingsView(e)}>
                 <div className='settings-dialog-content'>
                     <h2>Settings</h2>
-                    <label htmlFor="specialEffects">Special effects</label>
-                    <input type="checkbox" id="specialEffects" name="specialEffects" value="specialEffects" onChange={(e) => localStorage.setItem('specialEffects', JSON.stringify(e.target.checked))} defaultChecked />
-                    <br />
-                    <label htmlFor="devMode">Developer mode</label>
-                    <input type="checkbox" id="devMode" name="devMode" value="devMode" onChange={(e) => localStorage.setItem('devMode', JSON.stringify(e.target.checked))} />
-                    <br />
-                    <label htmlFor="darkMode">Theme: </label>
-                    <select id="theme" name="theme" value={theme} onChange={(e) => handleThemeChange(e.target.value)}>
-                        <option value="system">System</option>
-                        <option value="light">Light</option>
-                        <option value="dark">Dark</option>
-                    </select>
+                    <div className="inline-form-group">
+                        <label htmlFor="specialEffects">Special effects: </label>
+                        <input type="checkbox" id="specialEffects" name="specialEffects" value="specialEffects" onChange={(e) => localStorage.setItem('specialEffects', JSON.stringify(e.target.checked))} defaultChecked />
+                    </div>
+                    <div className="inline-form-group">
+                        <label htmlFor="devMode">Developer mode: </label>
+                        <input type="checkbox" id="devMode" name="devMode" value="devMode" onChange={(e) => localStorage.setItem('devMode', JSON.stringify(e.target.checked))} />
+                    </div>
+                    <div className="inline-form-group">
+                        <label htmlFor="darkMode">Theme: </label>
+                        <select id="theme" name="theme" value={theme} onChange={(e) => handleThemeChange(e.target.value)}>
+                            <option value="system">System</option>
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                        </select>
+                    </div>
                 </div>
             </dialog>
             <div className="sidebar" ref={sidebarRef}>
                 <div className="leaderboard">
                     <h2>Leaderboard</h2>
+                    {gameMode === 'stayAlive' ? <h3 id="minScore">Min Score: {minScore}</h3> : null}
                     <h3 id="roundNumber">Round: - / -</h3>
                     <div className="leaderboard-players">
                         {players.map((player, index) => (

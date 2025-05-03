@@ -37,6 +37,15 @@ function App() {
 	const [host, setHost] = useState<string>("");
 	const [finalPlayers, setFinalPlayers] = useState<Player[]>([]);
 	const [lastConnectedLobby, setLastConnectedLobby] = useState<string>("");
+	const gameModeOptions = {
+		normal: "Normal",
+		// stayAlive: "Stay alive",
+		firstToAnswer: "First to answer",
+		ultraInstinct: "Ultra instinct"
+	} as { [key: string]: string };
+	const [currentMode, setCurrentMode] = useState<string>("normal");
+	const [minScore, setMinScore] = useState<number>(0);
+	const [roundDuration, setRoundDuration] = useState<number>(20);
 
 	const audioContextRef = useRef<AudioContext | null>(null);
 	const gainNodeRef = useRef<GainNode | null>(null);
@@ -55,6 +64,7 @@ function App() {
 	const gsfeedbackRef = useRef<HTMLParagraphElement>(null);
 	const roundSummaryRef = useRef<HTMLDivElement>(null);
 	const summaryListRef = useRef<HTMLOListElement>(null);
+	const progressBarRef = useRef<HTMLDivElement>(null);
 	const lobbyPlayersRef = useRef<Player[]>([]);
 	const previousPlayersRef = useRef<Player[]>([]);
 
@@ -115,7 +125,8 @@ function App() {
 			hostControlsRef.current?.classList.add('invisible');
 		});
 
-		socket.on('onRoundStart', async (allSongs, correctIndex, correctSongData, currentRounds, rounds, roundCurrentTimestamp) => {
+		socket.on('onRoundStart', async (allSongs, correctIndex, correctSongData, currentRounds, rounds, roundCurrentTimestamp, minScore) => {
+			setMinScore(minScore);
 			if (!previousPlayersRef.current.length) {
 				setPreviousPlayers(lobbyPlayersRef.current);
 			}
@@ -178,7 +189,7 @@ function App() {
 			songPickerRef.current?.animate([{ transform: 'translateY(0%)', opacity: 1 }, { transform: 'translateY(100%)', opacity: 0 }], { duration: 400, easing: 'ease', fill: 'forwards' }).finished.then(() => {
 				const sidebarWidth = sidebarRef.current?.getBoundingClientRect().width;
 				songPickerRef.current?.classList.add('hidden');
-				mainScreenRef.current?.animate([{ paddingLeft: `${sidebarWidth}px` }, { paddingLeft: '0%' }], { duration: 400, easing: 'ease', fill: 'forwards' });
+				mainScreenRef.current?.animate([{ marginLeft: `${sidebarWidth}px` }, { marginLeft: '0%' }], { duration: 400, easing: 'ease', fill: 'forwards' });
 				sidebarRef.current?.classList.remove('open');
 				sidebarRef.current?.animate([{ transform: 'translateX(0%)' }, { transform: 'translateX(calc(-100% + 66px))' }], { duration: 400, easing: 'ease', fill: 'forwards' });
 				sidebarRef.current?.children[0].animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, easing: 'ease', fill: 'forwards' }).finished.then(() => {
@@ -193,6 +204,17 @@ function App() {
 		});
 
 		socket.on('onRoundEnd', () => {
+			clearInterval((window as any).bargeboTimerInterval);
+			progressBarRef.current!.style.width = "100%";
+			console.log("here");
+			setTimeout(() => {
+				console.log("there");
+				progressBarRef.current?.classList.add('right');
+				progressBarRef.current!.animate([{ width: "100%" }, { width: "0%" }], { duration: 4000, easing: 'linear', fill: 'none' }).finished.then(() => {
+					progressBarRef.current!.style.width = "0%";
+				});
+			}, 800);
+
 			if (sourceAudioBufferRef.current) {
 				sourceAudioBufferRef.current.stop();
 				sourceAudioBufferRef.current = null;
@@ -207,6 +229,18 @@ function App() {
 					animatePlayerMoves();
 				});
 			});
+		});
+
+		socket.on('stopAudio', () => {
+			console.log("stopAudio");
+			if (sourceAudioBufferRef.current) {
+				sourceAudioBufferRef.current.stop();
+				sourceAudioBufferRef.current = null;
+			}
+			if (timerRef.current) {
+				timerRef.current.innerHTML = "Time: 1s";
+				clearInterval((window as any).bargeboTimerInterval);
+			}
 		});
 
 		let serverClientTimeOffset = 0;
@@ -243,19 +277,21 @@ function App() {
 		if (!timerRef.current) return;
 		if ((window as any).bargeboTimerInterval) clearInterval((window as any).bargeboTimerInterval);
 
+		progressBarRef.current?.classList.remove('right');
 		function updateTimer() {
 			if (!timerRef.current || gameEnded) return;
 
 			let elapsed = Date.now() - serverClientTimeOffset - roundStartTimestamp;
 			if (elapsed < 0) elapsed = 0;
-			if (elapsed > 20000) elapsed = 20000;
+			if (elapsed > roundDuration * 1000) elapsed = roundDuration * 1000;
 
 			const intPart = Math.floor(elapsed / 1000);
 			const decPart = Math.floor((elapsed % 1000) / 10).toString().padStart(2, '0');
 			timerRef.current.innerHTML = `Time: ${intPart}.<small>${decPart}</small>s`;
+			progressBarRef.current!.style.width = `${(elapsed / 1000 / roundDuration) * 100}%`;
 
-			if (elapsed >= 20000) {
-				timerRef.current.innerHTML = `Time: 20s`;
+			if (elapsed >= roundDuration * 1000) {
+				timerRef.current.innerHTML = `Time: ${roundDuration}s`;
 				clearInterval((window as any).bargeboTimerInterval);
 			}
 		}
@@ -273,7 +309,7 @@ function App() {
 		sidebarRef.current?.classList.add("open");
 		sidebarRef.current?.animate([{ transform: 'translateX(calc(-100% + 66px))' }, { transform: 'translateX(0%)' }], { duration: 400, easing: 'ease', fill: 'forwards' });
 		sidebarRef.current?.children[0].animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, easing: 'ease', fill: 'forwards' });
-		mainScreenRef.current?.animate([{ paddingLeft: '0%' }, { paddingLeft: `${sidebarWidth}px` }], { duration: 400, easing: 'ease', fill: 'forwards' });
+		mainScreenRef.current?.animate([{ marginLeft: '0%' }, { marginLeft: `${sidebarWidth}px` }], { duration: 400, easing: 'ease', fill: 'forwards' });
 	};
 
 	const switchOnLeaveUI = () => {
@@ -295,7 +331,7 @@ function App() {
 			const sidebarWidth = sidebarRef.current?.getBoundingClientRect().width;
 			sidebarRef.current?.animate([{ transform: 'translateX(0%)' }, { transform: 'translateX(calc(-100% + 66px))' }], { duration: 400, easing: 'ease', fill: 'forwards' });
 			sidebarRef.current?.children[0].animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, easing: 'ease', fill: 'forwards' });
-			mainScreenRef.current?.animate([{ paddingLeft: `${sidebarWidth}px` }, { paddingLeft: '0%' }], { duration: 400, easing: 'ease', fill: 'forwards' });
+			mainScreenRef.current?.animate([{ marginLeft: `${sidebarWidth}px` }, { marginLeft: '0%' }], { duration: 400, easing: 'ease', fill: 'forwards' });
 			startScreenContentRef.current?.animate([{ transform: 'translateY(30%)', opacity: 0 }, { transform: 'translateY(0%)', opacity: 1 }], { duration: 300, easing: 'ease', fill: 'forwards' });
 			lobbiesListRef.current?.animate([{ transform: 'translateY(30%)', opacity: 0 }, { transform: 'translateY(0%)', opacity: 1 }], { duration: 300, easing: 'ease', fill: 'forwards' });
 		}
@@ -328,14 +364,24 @@ function App() {
 	const startGame = () => {
 		if (lobbyPlayers.some(player => player.username === username && player.isHost)) {
 			const rounds = parseInt((document.getElementById('rounds') as HTMLInputElement).value);
-			if (rounds < 1 || rounds > 30 || isNaN(rounds)) {
+			const gameMode = currentMode;
+			if (gameMode === "ultraInstinct") {
+				setRoundDuration(5);
+			}
+			const podiumBonusScore = (document.getElementById('podiumBonusScore') as HTMLInputElement).checked;
+			if (!(gameMode in gameModeOptions)) {
+				gsfeedbackRef.current!.innerText = "Invalid mode.";
+				return;
+			} else if (roundDuration < 5 || roundDuration > 30 || isNaN(roundDuration)) {
+				gsfeedbackRef.current!.innerText = "Invalid round duration. (5-30)";
+				return;
+			} else if (rounds < 1 || rounds > 30 || isNaN(rounds)) {
 				gsfeedbackRef.current!.innerText = "Invalid number of rounds. (1-30)";
 				return;
 			} else {
 				gsfeedbackRef.current!.innerText = "";
 			}
-			socket.emit('announceGameStart', lobbyName, rounds);
-			socket.emit('announceRoundStart', lobbyName);
+			socket.emit('announceGameStart', lobbyName, rounds, gameMode, roundDuration, podiumBonusScore);
 		} else {
 			gsfeedbackRef.current!.innerText = "You are not the host.";
 		}
@@ -380,7 +426,7 @@ function App() {
 		songPickerRef.current?.classList.add('invisible');
 		sidebarRef.current?.classList.add('open');
 		const sidebarWidth = sidebarRef.current?.getBoundingClientRect().width;
-		mainScreenRef.current?.animate([{ paddingLeft: '0%' }, { paddingLeft: `${sidebarWidth}px` }], { duration: 400, easing: 'ease', fill: 'forwards' });
+		mainScreenRef.current?.animate([{ marginLeft: '0%' }, { marginLeft: `${sidebarWidth}px` }], { duration: 400, easing: 'ease', fill: 'forwards' });
 		sidebarRef.current?.animate([{ transform: 'translateX(calc(-100% + 66px))' }, { transform: 'translateX(0%)' }], { duration: 400, easing: 'ease', fill: 'forwards' });
 		sidebarRef.current?.children[0].animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, easing: 'ease', fill: 'forwards' });
 		if (lobbyPlayers.some(player => player.username === username && player.isHost)) {
@@ -423,7 +469,6 @@ function App() {
 					playersList[index].style.transition = "none";
 					playersList[index].style.transform = `translateY(0px)`;
 					playersList[index].style.color = "var(--text-color)";
-					console.log(lobbyPlayersRef.current);
 					setPreviousPlayers(lobbyPlayersRef.current);
 				}, 1500);
 			}
@@ -432,7 +477,7 @@ function App() {
 
 	return (
 		<div className="main">
-			<Sidebar players={lobbyPlayers} gainNodeRef={gainNodeRef} sidebarRef={sidebarRef} gameEnded={gameEnded} yourUsername={username} host={host} onLeaveLobby={onLeaveLobby} />
+			<Sidebar players={lobbyPlayers} gainNodeRef={gainNodeRef} sidebarRef={sidebarRef} gameEnded={gameEnded} yourUsername={username} host={host} onLeaveLobby={onLeaveLobby} gameMode={currentMode} minScore={minScore} />
 			<div className="main-screen" ref={mainScreenRef}>
 				<h1>BARGEBO GUESSER</h1>
 				<div className='start-screen-content' ref={startScreenContentRef}>
@@ -482,14 +527,47 @@ function App() {
 					</ul>
 				</div>
 				<div className='game-screen-content hidden' ref={gameScreenContentRef}>
-					<h2 className='timer hidden invisible' ref={timerRef}>Time: 0s</h2>
+					<h2 className='timer hidden invisible' ref={timerRef}></h2>
 					<div className='host-controls invisible' ref={hostControlsRef}>
-						<div>
-							<label>Number of rounds:</label>
-							<input id='rounds' type="number" min={1} max={30} placeholder="Number of rounds" />
-							<p id='gsfeedback' className='error' ref={gsfeedbackRef}></p>
-							<button className='submitButton' type="submit" onClick={startGame}>Start</button>
+						<label htmlFor='rounds'>Number of rounds:</label>
+						<input id='rounds' type="number" min={1} max={30} placeholder="Number of rounds" />
+						<label htmlFor='gameMode'>Game mode:</label>
+						<div className='gameMode' id='gameMode'>
+							<div className='gameModeSelected' tabIndex={0} onFocus={() => {
+								document.querySelector('.gameModeOptions')?.classList.add('gameModeOptionsVisible');
+							}} onBlur={() => {
+								document.querySelector('.gameModeOptions')?.animate([{ opacity: 1, transform: "translateY(0)" }, { opacity: 0, transform: "translateY(-0.5em)" }], { duration: 150, easing: 'ease', fill: 'auto' }).finished.then(() => {
+									document.querySelector('.gameModeOptions')?.classList.remove('gameModeOptionsVisible');
+								})
+							}}>
+								<span id='selectedGameMode'>{gameModeOptions[currentMode]}</span>
+								<svg className='dropdownIcon' stroke="var(--text-color)" fill="var(--text-color)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+									<path d="M7 10l5 5 5-5z"></path>
+								</svg>
+							</div>
+							<div className='gameModeOptions'>
+								{Object.entries(gameModeOptions).map(([key, value]) => {
+									if (key === currentMode) return null;
+									return (
+										<div key={key} className='gameModeOption' onClick={() => { setCurrentMode(key); console.log(key); }}>
+											{value}
+										</div>
+									)
+								})}
+							</div>
 						</div>
+						{currentMode !== "ultraInstinct" ? (
+							<>
+								<label htmlFor='roundDuration'>Round duration:</label>
+								<input id='roundDuration' type="number" min={5} max={30} defaultValue={20} placeholder="Round duration" onChange={(e) => setRoundDuration(parseInt(e.target.value))} />
+							</>
+						) : null}
+						<div className="inline-form-group">
+							<label htmlFor="podiumBonusScore">Podium bonus score:</label>
+							<input id="podiumBonusScore" type="checkbox" />
+						</div>
+						<p id='gsfeedback' className='error' ref={gsfeedbackRef}></p>
+						<button className='submitButton' type="submit" onClick={startGame}>Start</button>
 					</div>
 				</div>
 				<div className='round-summary hidden' ref={roundSummaryRef}>
@@ -507,6 +585,7 @@ function App() {
 				<SongPicker songs={songs} onSongSelect={onSongSelection} ref={songPickerRef} />
 				<GameSummary players={finalPlayers} onLeaveLobby={switchOnLeaveUI} onLobbyReturn={onLobbyReturn} ref={gameSummaryRef} lobbyStillExists={Object.keys(lobbyList).some(lobby => lobby === lastConnectedLobby) ? true : false} />
 				<footer>Borys Gajewski & Mateusz Antkiewicz @ 2025</footer>
+				<div className='progress-bar' ref={progressBarRef}></div>
 			</div>
 		</div>
 	);

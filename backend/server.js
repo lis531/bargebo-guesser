@@ -102,6 +102,8 @@ async function announceRoundStart(lobbyName) {
     lobbies[lobbyName].roundStarted = true;
     lobbies[lobbyName].currentRound += 1;
     lobbies[lobbyName].firstAnswerPlayerId = '';
+    lobbies[lobbyName].secondAnswerPlayerId = '';
+    lobbies[lobbyName].thirdAnswerPlayerId = '';
     lobbies[lobbyName].roundStartTimestamp = null;
     io.emit('onLobbyListChanged', getPublicLobbies());
 
@@ -130,16 +132,24 @@ async function announceRoundStart(lobbyName) {
         console.error("Failed to start round: Song data missing.");
         return;
     }
+    if (!lobbies[lobbyName]) return;
     console.log("Starting round " + lobbies[lobbyName].currentRound);
     setTimeout(() => {
         if (!lobbies[lobbyName]) return;
         lobbies[lobbyName].roundStartTimestamp = Date.now();
         lobbies[lobbyName].correctSongData = correctSongData;
-        io.to(lobbyName).emit('onRoundStart', lobbies[lobbyName].selectedTracks, lobbies[lobbyName].correctIndex, correctSongData, lobbies[lobbyName].currentRound, lobbies[lobbyName].rounds, lobbies[lobbyName].roundStartTimestamp);
+        const minScore = 0;
+        io.to(lobbyName).emit('onRoundStart', lobbies[lobbyName].selectedTracks, lobbies[lobbyName].correctIndex, correctSongData, lobbies[lobbyName].currentRound, lobbies[lobbyName].rounds, lobbies[lobbyName].roundStartTimestamp, minScore);
         lobbies[lobbyName].answerTimeout = setTimeout(() => {
             if (!lobbies[lobbyName]) return;
             announceRoundEnd(lobbyName);
-        }, 20000);
+        }, lobbies[lobbyName].roundDuration * 1000);
+        if (lobbies[lobbyName].gameMode === "ultraInstinct") {
+            setTimeout(() => {
+                if (!lobbies[lobbyName]) return;
+                io.to(lobbyName).emit('stopAudio');
+            }, 1000)
+        }
     }, lobbies[lobbyName].currentRound == 1 ? 0 : 3500);
 }
 
@@ -261,7 +271,8 @@ io.on('connection', (socket) => {
 
         if (lobbies[lobbyName].roundStarted) {
             const { selectedTracks, correctIndex, correctSongData, currentRound, rounds, roundStartTimestamp } = lobbies[lobbyName];
-            socket.emit('onRoundStart', selectedTracks, correctIndex, correctSongData, currentRound, rounds, roundStartTimestamp);
+            const minScore = 0;
+            socket.emit('onRoundStart', selectedTracks, correctIndex, correctSongData, currentRound, rounds, roundStartTimestamp, minScore);
         }
     });
 
@@ -272,8 +283,7 @@ io.on('connection', (socket) => {
         console.log(`User ${username} joined lobby ${lobbyName}`);
     });
 
-
-    socket.on('announceGameStart', async (lobbyName, rounds) => {
+    socket.on('announceGameStart', async (lobbyName, rounds, gameMode, roundDuration, podiumBonusScore) => {
         if (!lobbies[lobbyName]) return;
         const host = lobbies[lobbyName].players.find(player => player.id === socket.id);
         if (!host || !host.isHost) {
@@ -284,10 +294,28 @@ io.on('connection', (socket) => {
             socket.emit('onGameStartResponse', 'Invalid number of rounds!');
             return;
         }
+        if (gameMode !== 'normal' && gameMode !== 'stayAlive' && gameMode !== 'firstToAnswer' && gameMode !== 'ultraInstinct') {
+            socket.emit('onGameStartResponse', 'Invalid game mode!');
+            return;
+        }
+        if (roundDuration < 5 || roundDuration > 60) {
+            socket.emit('onGameStartResponse', 'Invalid round duration!');
+            return;
+        }
         lobbies[lobbyName].rounds = rounds;
+        lobbies[lobbyName].gameMode = gameMode;
+        if (gameMode === 'ultraInstinct') {
+            lobbies[lobbyName].roundDuration = 4;
+        } else {
+            lobbies[lobbyName].roundDuration = roundDuration;
+        }
+        lobbies[lobbyName].podiumBonusScore = podiumBonusScore;
         lobbies[lobbyName].roundStarted = false;
         lobbies[lobbyName].currentRound = 0;
         lobbies[lobbyName].firstAnswserPlayerId = '';
+        lobbies[lobbyName].secondAnswerPlayerId = '';
+        lobbies[lobbyName].thirdAnswerPlayerId = '';
+        lobbies[lobbyName].timeSinceFirstAnswer = 0;
         lobbies[lobbyName].roundStartTimestamp = null;
         for (const player of lobbies[lobbyName].players) {
             player.score = 0;
@@ -296,6 +324,7 @@ io.on('connection', (socket) => {
         }
         io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
         io.to(lobbyName).emit('onGameStart');
+        announceRoundStart(lobbyName);
     });
 
     socket.on('announceRoundStart', async (lobbyName) => {
@@ -327,17 +356,33 @@ io.on('connection', (socket) => {
                 player.choice = choiceIndex;
                 console.log(`Player ${player.username} answered with ${choiceIndex}`);
                 if (choiceIndex === lobby.correctIndex) {
-                    if (!lobby.firstAnswerPlayerId) {
-                        lobby.firstAnswerPlayerId = socket.id;
-                        player.score += 50;
+                    if (lobby.timeSinceFirstAnswer === 0) {
+                        lobby.timeSinceFirstAnswer = Date.now() - lobby.roundStartTimestamp;
                     }
-                    const maxScore = 500, minScore = 80, timeLimit = 20;
+                    if (lobby.podiumBonusScore) {
+                        if (!lobby.firstAnswerPlayerId) {
+                            lobby.firstAnswerPlayerId = socket.id;
+                            player.score += 50;
+                        } else if (!lobby.secondAnswerPlayerId) {
+                            lobby.secondAnswerPlayerId = socket.id;
+                            player.score += 25;
+                        } else if (!lobby.thirdAnswerPlayerId) {
+                            lobby.thirdAnswerPlayerId = socket.id;
+                            player.score += 10;
+                        }
+                    }
+                    const maxScore = 500, minScore = 80, timeLimit = lobby.roundDuration;
                     const timePassed = (Date.now() - lobby.roundStartTimestamp) / 1000;
-                    if (timePassed <= 0.5) {
-                        player.score += maxScore;
+                    if (lobby.gameMode === "firstToAnswer") {
+                        // nie wiem czy to działa
+                        player.score += Math.round(minScore + (maxScore - minScore) * (1 / timePassed - lobby.timeSinceFirstAnswer));
                     } else {
-                        const factor = Math.exp(-2 * (timePassed / timeLimit));
-                        player.score += Math.round(minScore + (maxScore - minScore) * factor);
+                        if (timePassed <= 0.5) {
+                            player.score += maxScore;
+                        } else {
+                            const factor = Math.exp(-2 * (timePassed / timeLimit));
+                            player.score += Math.round(minScore + (maxScore - minScore) * factor);
+                        }
                     }
                 }
                 break;
@@ -349,10 +394,12 @@ io.on('connection', (socket) => {
         const allAnswered = lobby.players.every(p => p.choice !== -1);
         if (allAnswered) {
             console.log(`All players in lobby ${lobbyName} answered, showing results...`);
-            if (lobby.answerTimeout) clearTimeout(lobby.answerTimeout);
-            lobby.answerTimeout = setTimeout(() => {
-                announceRoundEnd(lobbyName);
-            }, 5000);
+            if (lobby.roundDuration - ((Date.now() - lobby.roundStartTimestamp) / 1000) > 4) {
+                if (lobby.answerTimeout) clearTimeout(lobby.answerTimeout);
+                setTimeout(() => {
+                    announceRoundEnd(lobbyName);
+                }, 4000);
+            }
         } else {
             console.log(`Waiting on ${lobby.players.filter(p => p.choice === -1).length} players...`);
         }

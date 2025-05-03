@@ -16,6 +16,7 @@
 	justify-content: space-between;
 	min-height: 100vh;
 	width: 100%;
+	position: relative;
 
 	@media screen and (max-width: 1000px) {
 		padding-left: 0 !important;
@@ -42,6 +43,7 @@
 	label {
 		text-indent: 0.3rem;
 		margin-bottom: 0.1em;
+		margin-top: 0.3em;
 		font-size: large;
 	}
 
@@ -139,15 +141,63 @@
 	.game-screen-content {
 		display: flex;
 		flex-direction: column;
-		justify-content: flex-end;
 		gap: 1em;
 		justify-self: center;
 		width: 300px;
 		height: 30vh;
-		.host-controls > div {
+		.host-controls {
 			display: flex;
 			flex-direction: column;
 			justify-content: center;
+			.gameMode {
+				-webkit-user-select: none;
+				user-select: none;
+				cursor: pointer;
+				position: relative;
+				& > .gameModeSelected {
+					display: flex;
+					padding: 0.5em;
+					border-radius: 8px;
+					border: 2px solid transparent;
+					background-color: var(--button-background-color);
+					transition: border-color 0.25s;
+					box-shadow: 0 0 3px 1px #000000;
+					z-index: 10;
+					position: relative;
+					&:focus {
+						border-color: var(--accent-color);
+					}
+				}
+				.gameModeOptions {
+					opacity: 0;
+					visibility: hidden;
+					transform: translateY(-0.5em);
+					flex-direction: column;
+					position: absolute;
+					top: 100%;
+					left: 0;
+					width: 100%;
+					transition: opacity 0.25s, transform 0.25s, border-color 0.25s;
+					background-color: var(--additional-color);
+					border-radius: 8px;
+					box-shadow: 0 0 3px 1px #000000;
+					&.gameModeOptionsVisible {
+						opacity: 1;
+						transform: translateY(0);
+						visibility: visible;
+					}
+					.gameModeOption {
+						display: flex;
+						padding: 0.5em;
+						border-radius: 8px;
+						border: 2px solid transparent;
+						transition: border-color 0.25s;
+						&:hover {
+							border-color: var(--accent-color);
+						}
+					}
+				}
+			}
 		}
 		@media screen and (max-width: 1000px) {
 			&:has(.timer:not(.invisible)) {
@@ -214,6 +264,21 @@
 		@media screen and (max-width: 1000px) {
 			height: auto;
 			margin-top: auto;
+		}
+	}
+
+	.progress-bar {
+		position: absolute;
+		z-index: 1;
+		top: 0;
+		width: 0px;
+		height: 8px;
+		left: 0;
+		background: var(--accent-color);
+		transition: width 0.25s;
+		&.right {
+			left: auto;
+			right: 0;
 		}
 	}
 
