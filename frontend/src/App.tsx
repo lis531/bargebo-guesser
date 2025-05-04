@@ -206,11 +206,8 @@ function App() {
 			roundSummaryRef.current?.classList.add('hidden');
 			gameScreenContentRef.current?.classList.add('hidden');
 			songPickerRef.current?.animate([{ transform: 'translateY(0%)', opacity: 1 }, { transform: 'translateY(100%)', opacity: 0 }], { duration: 400, easing: 'ease', fill: 'forwards' }).finished.then(() => {
-				const sidebarWidth = sidebarRef.current?.getBoundingClientRect().width;
 				songPickerRef.current?.classList.add('hidden');
-				mainScreenRef.current?.animate([{ marginLeft: `${sidebarWidth}px` }, { marginLeft: '0%' }], { duration: 400, easing: 'ease', fill: 'forwards' });
 				sidebarRef.current?.classList.remove('open');
-				sidebarRef.current?.animate([{ transform: 'translateX(0%)' }, { transform: 'translateX(calc(-100% + 66px))' }], { duration: 400, easing: 'ease', fill: 'forwards' });
 				sidebarRef.current?.children[0].animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, easing: 'ease', fill: 'forwards' }).finished.then(() => {
 					setGameEnded(true);
 				});
@@ -327,14 +324,11 @@ function App() {
 	};
 
 	const switchGameUI = () => {
-		const sidebarWidth = sidebarRef.current?.getBoundingClientRect().width;
 		startScreenContentRef.current?.classList.toggle("hidden");
 		lobbiesListRef.current?.classList.toggle("hidden");
 		gameScreenContentRef.current?.classList.toggle("hidden");
 		sidebarRef.current?.classList.add("open");
-		sidebarRef.current?.animate([{ transform: 'translateX(calc(-100% + 66px))' }, { transform: 'translateX(0%)' }], { duration: 400, easing: 'ease', fill: 'forwards' });
 		sidebarRef.current?.children[0].animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, easing: 'ease', fill: 'forwards' });
-		mainScreenRef.current?.animate([{ marginLeft: '0%' }, { marginLeft: `${sidebarWidth}px` }], { duration: 400, easing: 'ease', fill: 'forwards' });
 	};
 
 	const switchOnLeaveUI = () => {
@@ -353,10 +347,7 @@ function App() {
 		lobbiesListRef.current?.classList.remove("hidden");
 		if (sidebarRef.current?.classList.contains("open")) {
 			sidebarRef.current?.classList.remove("open");
-			const sidebarWidth = sidebarRef.current?.getBoundingClientRect().width;
-			sidebarRef.current?.animate([{ transform: 'translateX(0%)' }, { transform: 'translateX(calc(-100% + 66px))' }], { duration: 400, easing: 'ease', fill: 'forwards' });
 			sidebarRef.current?.children[0].animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, easing: 'ease', fill: 'forwards' });
-			mainScreenRef.current?.animate([{ marginLeft: `${sidebarWidth}px` }, { marginLeft: '0%' }], { duration: 400, easing: 'ease', fill: 'forwards' });
 			startScreenContentRef.current?.animate([{ transform: 'translateY(30%)', opacity: 0 }, { transform: 'translateY(0%)', opacity: 1 }], { duration: 300, easing: 'ease', fill: 'forwards' });
 			lobbiesListRef.current?.animate([{ transform: 'translateY(30%)', opacity: 0 }, { transform: 'translateY(0%)', opacity: 1 }], { duration: 300, easing: 'ease', fill: 'forwards' });
 		}
@@ -450,9 +441,6 @@ function App() {
 		gameScreenContentRef.current?.classList.remove('hidden');
 		songPickerRef.current?.classList.add('invisible');
 		sidebarRef.current?.classList.add('open');
-		const sidebarWidth = sidebarRef.current?.getBoundingClientRect().width;
-		mainScreenRef.current?.animate([{ marginLeft: '0%' }, { marginLeft: `${sidebarWidth}px` }], { duration: 400, easing: 'ease', fill: 'forwards' });
-		sidebarRef.current?.animate([{ transform: 'translateX(calc(-100% + 66px))' }, { transform: 'translateX(0%)' }], { duration: 400, easing: 'ease', fill: 'forwards' });
 		sidebarRef.current?.children[0].animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, easing: 'ease', fill: 'forwards' });
 		if (lobbyPlayers.some(player => player.username === username && player.isHost)) {
 			hostControlsRef.current?.classList.remove("invisible");

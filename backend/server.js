@@ -61,7 +61,7 @@ function streamToBuffer(stream) {
 async function downloadFirebase(videoUrl) {
     try {
         const videoID = videoUrl.split('watch?v=')[1];
-        const file = bucket.file(`songs/${videoID}.mp3`);
+        const file = bucket.file(`songs/${videoID}.opus`);
         const [exists] = await file.exists();
 
         if (exists) {
@@ -151,7 +151,7 @@ async function announceRoundStart(lobbyName) {
             setTimeout(() => {
                 if (!lobbies[lobbyName]) return;
                 io.to(lobbyName).emit('stopAudio');
-            }, 1000)
+            }, 1500)
         }
     }, lobbies[lobbyName].currentRound == 1 ? 0 : 3500);
 }

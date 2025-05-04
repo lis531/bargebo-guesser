@@ -30,6 +30,17 @@ const bucket = admin.storage().bucket();
 const LAST_FM_API_KEY = process.env.LAST_FM_API_KEY;
 const REPLACE_FILES = false;
 const DOWNLOAD_ONLY_NEW = true;
+const REMOVE_ALL_SONGS = false;
+
+async function removeAllSongs() {
+    const [files] = await bucket.getFiles({ prefix: 'songs/' });
+    const deletePromises = files.map(file => file.delete());
+    await Promise.all(deletePromises);
+    console.log('All songs removed from Firebase Storage.');
+}
+if (REMOVE_ALL_SONGS) {
+    await removeAllSongs();
+}
 
 async function fetchTracks() {
     const limit = 50;
@@ -153,20 +164,20 @@ async function updateSongDB() {
 async function downloadSong(videoUrl) {
     const videoID = videoUrl.split('watch?v=')[1];
 
-    if (fs.existsSync('audio/' + videoID + '.mp3')) {
+    if (fs.existsSync('audio/' + videoID + '.opus')) {
         return new Promise((resolve, reject) => {
-            resolve(`${videoID}.mp3`);
+            resolve(`${videoID}.opus`);
         });
     }
 
     return new Promise((resolve, reject) => {
-        exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:30" --force-overwrites --audio-format mp3 --postprocessor-args "ffmpeg:-filter:a dynaudnorm" -o "${`audio/${videoID}.mp3`}" ${videoUrl}`, async (error) => {
+        exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:30" --force-overwrites --audio-format opus --audio-quality 64K --postprocessor-args "ffmpeg:-acodec libopus -b:a 64k -af loudnorm" -o "${`audio/${videoID}.opus`}" ${videoUrl}`, async (error) => {
             if (error) {
                 console.error(`Error downloading track: ${error.message}`);
                 reject(error);
             } else {
                 console.log(`Track downloaded: ${stdout}`);
-                resolve(`${videoID}.mp3`);
+                resolve(`${videoID}.opus`);
             }
         });
     });
@@ -174,8 +185,8 @@ async function downloadSong(videoUrl) {
 
 async function uploadFirebase(videoUrl) {
     const videoID = videoUrl.split('watch?v=')[1];
-    const filePath = `audio/${videoID}.mp3`;
-    const file = bucket.file(`songs/${videoID}.mp3`);
+    const filePath = `audio/${videoID}.opus`;
+    const file = bucket.file(`songs/${videoID}.opus`);
 
     try {
         const [exists] = await file.exists();
@@ -189,23 +200,23 @@ async function uploadFirebase(videoUrl) {
         }
 
         return await new Promise((resolve, reject) => {
-            exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:30" --force-overwrites --audio-format mp3 --postprocessor-args "ffmpeg:-filter:a dynaudnorm" -o "${filePath}" ${videoUrl}`, async (error) => {
+            exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:30" --force-overwrites --audio-format opus --audio-quality 64K --postprocessor-args "ffmpeg:-acodec libopus -b:a 64k -af loudnorm" -o "${filePath}" ${videoUrl}`, async (error) => {
                 if (error) {
                     console.error(`Error downloading track: ${error.message}`);
                     reject(error);
                     return;
                 }
 
-                console.log(`Downloaded ${videoID}.mp3`);
+                console.log(`Downloaded ${videoID}.opus`);
 
                 try {
-                    const destination = `songs/${videoID}.mp3`;
+                    const destination = `songs/${videoID}.opus`;
                     await bucket.upload(filePath, {
                         destination,
-                        metadata: { contentType: 'audio/mpeg' }
+                        metadata: { contentType: 'audio/opus' }
                     });
 
-                    console.log(`Uploaded ${videoID}.mp3 to Firebase Storage.`);
+                    console.log(`Uploaded ${videoID}.opus to Firebase Storage.`);
 
                     const [url] = await bucket.file(destination).getSignedUrl({
                         action: 'read',
@@ -249,41 +260,33 @@ async function downloadSongsDB(songsDB) {
         const blockEnd = Math.min(songsDB.length, blockStart + BLOCK_SIZE);
 
         for (let i = blockStart; i < blockEnd; i++) {
-            promises.push(uploadFirebase(`https://www.youtube.com/watch?v=${songsDB[i].id}`).catch((error) => error));
+            promises.push(
+                uploadFirebase(`https://www.youtube.com/watch?v=${songsDB[i].id}`)
+                    .then(url => {
+                        if (url) successfulSongs.push(songsDB[i]);
+                        return url;
+                    })
+                    .catch(error => {
+                        console.log(`Failed to download/upload song: ${songsDB[i].title} - ${songsDB[i].artist}. Blacklisting.`);
+                        const entry = { title: songsDB[i].title, artist: songsDB[i].artist, id: songsDB[i].id };
+                        if (!blacklist.some(s => s.title === entry.title && s.artist === entry.artist && s.id === entry.id)) {
+                            blacklist.push(entry);
+                            fs.writeFileSync('blacklist.json', JSON.stringify(blacklist, null, 2));
+                        }
+                    })
+            );
         }
-
-        for (let i = blockStart, j = 0; i < blockEnd; i++, j++) {
-            const result = await promises[j];
-            if (result instanceof Error || result === null) {
-                console.log(`Failed to download/upload song: ${songsDB[i].title} - ${songsDB[i].artist}. Blacklisting in blacklist.json.`);
-                const entry = {
-                    title: songsDB[i].title,
-                    artist: songsDB[i].artist,
-                    id: songsDB[i].id
-                };
-                if (!blacklist.some(s => s.title === entry.title && s.artist === entry.artist && s.id === entry.id)) {
-                    blacklist.push(entry);
-                    fs.writeFileSync('blacklist.json', JSON.stringify(blacklist, null, 2));
-                }
-            } else {
-                successfulSongs.push(songsDB[i]);
-            }
-            if ((i + 1) % 100 === 0) {
-                console.log("Downloaded " + (i + 1) + " out of " + songsDB.length + " songs.")
-            }
+        await Promise.all(promises);
+        if ((blockEnd) % 100 === 0) {
+            console.log(`Processed ${blockEnd} / ${songsDB.length} songs.`);
         }
     }
 
     const previousSongs = fs.existsSync('songDB.json') ? JSON.parse(fs.readFileSync('songDB.json', 'utf8')) : [];
-    const allSongs = [...successfulSongs, ...previousSongs];
-
-    fs.writeFile('songDB.json', JSON.stringify(allSongs, null, 2), (err) => {
-        if (err) {
-            console.error('Error writing file:', err);
-        } else {
-            console.log(`File written successfully with ${allSongs.length} total songs!`);
-        }
-    });
+    const allSongs = [...previousSongs, ...successfulSongs].reduce((map, song) => { map.set(song.id, song); return map; }, new Map()).values();
+    const merged = Array.from(allSongs);
+    fs.writeFileSync('songDB.json', JSON.stringify(merged, null, 2));
+    console.log(`songDB.json updated: ${merged.length} total songs.`);
 }
 
 await updateSongDB();

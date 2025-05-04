@@ -19,11 +19,6 @@
 	position: relative;
 	overflow: hidden;
 
-	@media screen and (max-width: 1000px) {
-		padding-left: 0 !important;
-		justify-content: start;
-	}
-
 	& > h1 {
 		font-family: 'Syne';
 		font-size: 5em;
