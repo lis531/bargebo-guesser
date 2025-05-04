@@ -14,9 +14,9 @@
     --background-color: #1b2027;
     --text-color: rgba(255, 255, 255, 0.87);
     --accent-color: #535bf2;
+    --accent-color-2: #8491e6;
     --button-background-color: #1a1a1a;
     --additional-color: #131313;
-    --button-hover-color: #646cff;
     --incorrect-color: #e25d68;
     --correct-color: #00ff00;
 
@@ -122,8 +122,10 @@ dialog {
 
 .error {
     color: var(--incorrect-color);
-    margin: 0.5em 0;
-    height: 24px;
+    margin: 0 0 0.5em 0;
+    line-height: 1.2;
+    height: 20px;
+    white-space: nowrap;
 }
 
 .hidden {

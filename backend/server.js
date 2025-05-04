@@ -95,6 +95,8 @@ for (let i = 0; i < allSongs.length; i++) {
 
 console.log("Loaded the songs DB of " + allSongs.length + " songs.");
 
+const artists = allSongs.map(song => song.artist).filter((value, index, self) => self.indexOf(value) === index);
+
 async function announceRoundStart(lobbyName) {
     if (!lobbies[lobbyName]) return;
 
@@ -107,16 +109,16 @@ async function announceRoundStart(lobbyName) {
     lobbies[lobbyName].roundStartTimestamp = null;
     io.emit('onLobbyListChanged', getPublicLobbies());
 
-
+    const filteredSongs = allSongs.filter(song => lobbies[lobbyName].selectedArtists.includes(song.artist));
     const selectedTracks = [];
     for (let i = 0; i < NUM_SONGS_TO_GUESS; i++) {
-        const randomIndex = Math.floor(Math.random() * allSongs.length);
-        const isDuplicate = selectedTracks.some(track => track.url === allSongs[randomIndex].url);
+        const randomIndex = Math.floor(Math.random() * filteredSongs.length);
+        const isDuplicate = selectedTracks.some(track => track.title === filteredSongs[randomIndex].title);
         if (isDuplicate) {
             i--;
             continue;
         }
-        selectedTracks.push(allSongs[randomIndex]);
+        selectedTracks.push(filteredSongs[randomIndex]);
     }
     console.log("Selected tracks: " + selectedTracks.map(track => track.title).join(", "));
 
@@ -139,7 +141,7 @@ async function announceRoundStart(lobbyName) {
         lobbies[lobbyName].roundStartTimestamp = Date.now();
         lobbies[lobbyName].correctSongData = correctSongData;
         const minScore = 0;
-        io.to(lobbyName).emit('onRoundStart', lobbies[lobbyName].selectedTracks, lobbies[lobbyName].correctIndex, correctSongData, lobbies[lobbyName].currentRound, lobbies[lobbyName].rounds, lobbies[lobbyName].roundStartTimestamp, minScore);
+        io.to(lobbyName).emit('onRoundStart', lobbies[lobbyName].selectedTracks, lobbies[lobbyName].correctIndex, correctSongData, lobbies[lobbyName].currentRound, lobbies[lobbyName].roundStartTimestamp, minScore);
         lobbies[lobbyName].answerTimeout = setTimeout(() => {
             if (!lobbies[lobbyName]) return;
             announceRoundEnd(lobbyName);
@@ -236,10 +238,21 @@ io.on('connection', (socket) => {
             players: [{ id: socket.id, username: username, choice: -1, score: 0, isHost: true }],
             roundStarted: false,
             currentRound: 0,
-            rounds: 0
+            rounds: 0,
+            gameMode: 'normal',
+            roundDuration: 30,
+            selectedTracks: [],
+            correctIndex: -1,
+            correctSongData: null,
+            firstAnswerPlayerId: '',
+            secondAnswerPlayerId: '',
+            thirdAnswerPlayerId: '',
+            timeSinceFirstAnswer: 0,
+            answerTimeout: null,
+            podiumBonusScore: false
         };
         socket.join(lobbyName);
-        socket.emit('createLobbyResponse', lobbyName, '');
+        socket.emit('createLobbyResponse', lobbyName, '', artists);
         io.emit('onLobbyListChanged', getPublicLobbies());
         io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
         console.log(`Lobby ${lobbyName} created by ${username}`);
@@ -272,7 +285,7 @@ io.on('connection', (socket) => {
         if (lobbies[lobbyName].roundStarted) {
             const { selectedTracks, correctIndex, correctSongData, currentRound, rounds, roundStartTimestamp } = lobbies[lobbyName];
             const minScore = 0;
-            socket.emit('onRoundStart', selectedTracks, correctIndex, correctSongData, currentRound, rounds, roundStartTimestamp, minScore);
+            socket.emit('onRoundStart', selectedTracks, correctIndex, correctSongData, currentRound, roundStartTimestamp, minScore);
         }
     });
 
@@ -283,7 +296,7 @@ io.on('connection', (socket) => {
         console.log(`User ${username} joined lobby ${lobbyName}`);
     });
 
-    socket.on('announceGameStart', async (lobbyName, rounds, gameMode, roundDuration, podiumBonusScore) => {
+    socket.on('announceGameStart', async (lobbyName, rounds, gameMode, roundDuration, podiumBonusScore, selectedArtists) => {
         if (!lobbies[lobbyName]) return;
         const host = lobbies[lobbyName].players.find(player => player.id === socket.id);
         if (!host || !host.isHost) {
@@ -302,6 +315,13 @@ io.on('connection', (socket) => {
             socket.emit('onGameStartResponse', 'Invalid round duration!');
             return;
         }
+        if (selectedArtists.length > 0) {
+            const filteredSongs = allSongs.filter(song => selectedArtists.includes(song.artist));
+            if (filteredSongs.length < NUM_SONGS_TO_GUESS) {
+                socket.emit('onGameStartResponse', 'Not enough songs from selected artists!');
+                return;
+            }
+        }
         lobbies[lobbyName].rounds = rounds;
         lobbies[lobbyName].gameMode = gameMode;
         if (gameMode === 'ultraInstinct') {
@@ -317,13 +337,14 @@ io.on('connection', (socket) => {
         lobbies[lobbyName].thirdAnswerPlayerId = '';
         lobbies[lobbyName].timeSinceFirstAnswer = 0;
         lobbies[lobbyName].roundStartTimestamp = null;
+        lobbies[lobbyName].selectedArtists = selectedArtists;
         for (const player of lobbies[lobbyName].players) {
             player.score = 0;
             console.log(player.username + " score: " + player.score);
             player.choice = -1;
         }
         io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
-        io.to(lobbyName).emit('onGameStart');
+        io.to(lobbyName).emit('onGameStart', lobbies[lobbyName].roundDuration, lobbies[lobbyName].rounds);
         announceRoundStart(lobbyName);
     });
 

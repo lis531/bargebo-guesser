@@ -35,6 +35,13 @@
         display: flex;
         padding: 4px;
         box-shadow: 0 0 3px 1px rgba(0, 0, 0, 0.5);
+        &:focus {
+            outline: none;
+            border: 2px solid transparent;
+        }
+        &:hover {
+            border: 2px solid var(--accent-color);
+        }
     }
     .settings-button {
         & > svg {
@@ -68,6 +75,10 @@
     @media  (max-width: 1000px) {
         display: none;
     }
+}
+
+body:has(.settings-dialog[open]) .sidebar .settings-button svg {
+    rotate: 90deg;
 }
 
 .settings-dialog {
