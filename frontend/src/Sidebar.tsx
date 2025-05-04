@@ -18,6 +18,8 @@ interface Props {
     host: string;
     gameMode: string;
     minScore: number;
+    rounds: number;
+    currentRound: number;
 }
 
 function Sidebar(props: { players: Player[] } & Props) {
@@ -29,6 +31,8 @@ function Sidebar(props: { players: Player[] } & Props) {
     const host = props.host;
     const gameMode = props.gameMode;
     const minScore = props.minScore;
+    const rounds = props.rounds;
+    const currentRound = props.currentRound;
     const { players } = props;
 
     const initialVolume = Number(localStorage.getItem('volume')) || 50;
@@ -100,7 +104,7 @@ function Sidebar(props: { players: Player[] } & Props) {
                 <div className="leaderboard">
                     <h2>Leaderboard</h2>
                     {gameMode === 'stayAlive' ? <h3 id="minScore">Min Score: {minScore}</h3> : null}
-                    <h3 id="roundNumber">Round: - / -</h3>
+                    <h3 id="roundNumber">Round: {currentRound && rounds && !gameEnded ? `${currentRound} / ${rounds}` : "- / -"}</h3>
                     <div className="leaderboard-players">
                         {players.map((player, index) => (
                             <div key={index} className={`leaderboard-player ${player.username === yourUsername ? 'clients-player' : ''}`}>

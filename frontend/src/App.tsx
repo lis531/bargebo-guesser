@@ -50,11 +50,12 @@ function App() {
 	const [minScore, setMinScore] = useState<number>(0);
 	const [roundDuration, setRoundDuration] = useState<number>(20);
 	const [rounds, setRounds] = useState<number>(0);
-
+	const [currentRound, setCurrentRound] = useState<number>(0);
+	
 	const audioContextRef = useRef<AudioContext | null>(null);
 	const gainNodeRef = useRef<GainNode | null>(null);
 	const sourceAudioBufferRef = useRef<AudioBufferSourceNode | null>(null);
-
+	
 	const timerRef = useRef<HTMLHeadingElement>(null);
 	const hostControlsRef = useRef<HTMLDivElement>(null);
 	const songPickerRef = useRef<HTMLDivElement>(null);
@@ -68,6 +69,7 @@ function App() {
 	const gsfeedbackRef = useRef<HTMLParagraphElement>(null);
 	const roundSummaryRef = useRef<HTMLDivElement>(null);
 	const summaryListRef = useRef<HTMLOListElement>(null);
+	const roundDurationRef = useRef(roundDuration);
 	const progressBarRef = useRef<HTMLDivElement>(null);
 	const lobbyPlayersRef = useRef<Player[]>([]);
 	const previousPlayersRef = useRef<Player[]>([]);
@@ -86,7 +88,9 @@ function App() {
 
 		const handlePlayersChange = (players: Player[]) => {
 			setLobbyPlayers(players);
-			if (lobbyPlayersRef.current.length > players.length) {
+			if (previousPlayersRef.current.length === 0) {
+				setPreviousPlayers(players);
+			} else if (lobbyPlayersRef.current.length > players.length) {
 				const leftPlayer = lobbyPlayersRef.current.find(player => !players.some(p => p.id === player.id));
 				if (leftPlayer) {
 					setPreviousPlayers(prev => prev.filter(p => p.id !== leftPlayer.id));
@@ -118,7 +122,7 @@ function App() {
 			}
 		});
 
-		socket.on("joinLobbyResponse", (err) => {
+		socket.on("joinLobbyResponse", (err, rounds, roundDuration) => {
 			if (err !== '') {
 				ssfeedbackRef.current!.innerText = err;
 				return;
@@ -126,12 +130,14 @@ function App() {
 			switchGameUI();
 			timerRef.current?.classList.add('hidden');
 			songPickerRef.current?.classList.add('hidden');
+			setRoundDuration(roundDuration);
+			setRounds(rounds);
 		});
 
 		socket.on('onGameStart', (roundDuration, rounds) => {
 			setGameEnded(false);
 			setRoundDuration(roundDuration);
-			setRounds(rounds)
+			setRounds(rounds);
 			hostControlsRef.current?.classList.add('invisible');
 		});
 
@@ -139,8 +145,9 @@ function App() {
 			gsfeedbackRef.current!.innerText = err;
 		});
 
-		socket.on('onRoundStart', async (allSongs, correctIndex, correctSongData, currentRounds, roundCurrentTimestamp, minScore) => {
+		socket.on('onRoundStart', async (allSongs, correctIndex, correctSongData, currentRound, roundCurrentTimestamp, minScore) => {
 			setMinScore(minScore);
+			setCurrentRound(currentRound);
 			if (!previousPlayersRef.current.length) {
 				setPreviousPlayers(lobbyPlayersRef.current);
 			}
@@ -164,8 +171,6 @@ function App() {
 				roundSummaryRef.current?.classList.add('hidden');
 				gameScreenContentRef.current?.classList.remove('hidden');
 				gameScreenContentRef.current?.animate([{ transform: 'translateY(100%)', opacity: 0 }, { transform: 'translateY(0%)', opacity: 1 }], { duration: 400, easing: 'ease', fill: 'forwards' });
-				const roundNumber = document.getElementById('roundNumber') as HTMLElement;
-				roundNumber.innerHTML = `Round: ${currentRounds} / ${rounds}`;
 				timerRef.current?.classList.remove('invisible');
 				if (songPickerRef.current?.classList.contains('invisible')) {
 					songPickerRef.current?.classList.remove('invisible');
@@ -186,7 +191,7 @@ function App() {
 						offsetSeconds = 0;
 					}
 					sourceAudioBufferRef.current.start(0, offsetSeconds);
-					timerCountdown(roundCurrentTimestamp, serverClientTimeOffset);
+					timerCountdown(roundCurrentTimestamp, serverClientTimeOffset, roundDurationRef.current!);
 				}, (err) => {
 					console.log("Playback error: " + err);
 				});
@@ -208,8 +213,6 @@ function App() {
 				sidebarRef.current?.animate([{ transform: 'translateX(0%)' }, { transform: 'translateX(calc(-100% + 66px))' }], { duration: 400, easing: 'ease', fill: 'forwards' });
 				sidebarRef.current?.children[0].animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, easing: 'ease', fill: 'forwards' }).finished.then(() => {
 					setGameEnded(true);
-					const roundNumber = document.getElementById('roundNumber') as HTMLElement;
-					roundNumber.innerHTML = "Round: - / -";
 				});
 			});
 			setFinalPlayers(finalPlayers);
@@ -248,10 +251,6 @@ function App() {
 				sourceAudioBufferRef.current.stop();
 				sourceAudioBufferRef.current = null;
 			}
-			if (timerRef.current) {
-				timerRef.current.innerHTML = "Time: 1s";
-				clearInterval((window as any).bargeboTimerInterval);
-			}
 		});
 
 		let serverClientTimeOffset = 0;
@@ -285,6 +284,10 @@ function App() {
 	}, [previousPlayers]);
 
 	useEffect(() => {
+		roundDurationRef.current = roundDuration;
+	}, [roundDuration]);
+
+	useEffect(() => {
 		setFilteredArtists(prevFilteredArtists => {
 			const sortedArtists = [...prevFilteredArtists].sort((a, b) => {
 				if (selectedArtists.includes(a) && !selectedArtists.includes(b)) return -1;
@@ -295,7 +298,7 @@ function App() {
 		});
 	}, [selectedArtists]);
 
-	const timerCountdown = (roundStartTimestamp: number, serverClientTimeOffset: number) => {
+	const timerCountdown = (roundStartTimestamp: number, serverClientTimeOffset: number, roundDuration: number) => {
 		if (!timerRef.current) return;
 		if ((window as any).bargeboTimerInterval) clearInterval((window as any).bargeboTimerInterval);
 
@@ -499,7 +502,7 @@ function App() {
 
 	return (
 		<div className="main">
-			<Sidebar players={lobbyPlayers} gainNodeRef={gainNodeRef} sidebarRef={sidebarRef} gameEnded={gameEnded} yourUsername={username} host={host} onLeaveLobby={onLeaveLobby} gameMode={currentMode} minScore={minScore} />
+			<Sidebar players={lobbyPlayers} gainNodeRef={gainNodeRef} sidebarRef={sidebarRef} gameEnded={gameEnded} rounds={rounds} currentRound={currentRound} yourUsername={username} host={host} onLeaveLobby={onLeaveLobby} gameMode={currentMode} minScore={minScore} />
 			<div className="main-screen" ref={mainScreenRef}>
 				<h1>BARGEBO GUESSER</h1>
 				<div className='start-screen-content' ref={startScreenContentRef}>
@@ -591,7 +594,7 @@ function App() {
 									const searchValue = e.target.value.toLowerCase();
 									setFilteredArtists(artists.filter(artist => artist.toLowerCase().includes(searchValue)));
 								}} />
-								<svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 256 256" height="21px" width="21px" xmlns="http://www.w3.org/2000/svg" onClick={() => {setSelectedArtists([]); setFilteredArtists(artists)}}>
+								<svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 256 256" height="21px" width="21px" xmlns="http://www.w3.org/2000/svg" onClick={() => {setSelectedArtists([]); setFilteredArtists(artists)}}>
 									<path d="M235.5,216.81c-22.56-11-35.5-34.58-35.5-64.8V134.73a15.94,15.94,0,0,0-10.09-14.87L165,110a8,8,0,0,1-4.48-10.34l21.32-53a28,28,0,0,0-16.1-37,28.14,28.14,0,0,0-35.82,16,.61.61,0,0,0,0,.12L108.9,79a8,8,0,0,1-10.37,4.49L73.11,73.14A15.89,15.89,0,0,0,55.74,76.8C34.68,98.45,24,123.75,24,152a111.45,111.45,0,0,0,31.18,77.53A8,8,0,0,0,61,232H232a8,8,0,0,0,3.5-15.19ZM67.14,88l25.41,10.3a24,24,0,0,0,31.23-13.45l21-53c2.56-6.11,9.47-9.27,15.43-7a12,12,0,0,1,6.88,15.92L145.69,93.76a24,24,0,0,0,13.43,31.14L184,134.73V152c0,.33,0,.66,0,1L55.77,101.71A108.84,108.84,0,0,1,67.14,88Zm48,128a87.53,87.53,0,0,1-24.34-42,8,8,0,0,0-15.49,4,105.16,105.16,0,0,0,18.36,38H64.44A95.54,95.54,0,0,1,40,152a85.9,85.9,0,0,1,7.73-36.29l137.8,55.12c3,18,10.56,33.48,21.89,45.16Z"></path>
 								</svg>
 							</div>
@@ -630,7 +633,7 @@ function App() {
 				</div>
 				<SongPicker songs={songs} onSongSelect={onSongSelection} ref={songPickerRef} />
 				<GameSummary players={finalPlayers} onLeaveLobby={switchOnLeaveUI} onLobbyReturn={onLobbyReturn} ref={gameSummaryRef} lobbyStillExists={Object.keys(lobbyList).some(lobby => lobby === lastConnectedLobby) ? true : false} />
-				<footer>Borys Gajewski & Mateusz Antkiewicz @ 2025</footer>
+				<footer>Borys Gajewski & Mateusz Antkiewicz @ {new Date().getFullYear()}</footer>
 				<div className='progress-bar' ref={progressBarRef}></div>
 			</div>
 		</div>

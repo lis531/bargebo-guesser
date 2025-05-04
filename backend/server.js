@@ -109,14 +109,15 @@ async function announceRoundStart(lobbyName) {
     lobbies[lobbyName].roundStartTimestamp = null;
     io.emit('onLobbyListChanged', getPublicLobbies());
 
-    const filteredSongs = allSongs.filter(song => lobbies[lobbyName].selectedArtists.includes(song.artist));
+    const filteredSongs = lobbies[lobbyName].selectedArtists !== null ? allSongs.filter(song => lobbies[lobbyName].selectedArtists.includes(song.artist)) : allSongs;
     const selectedTracks = [];
     for (let i = 0; i < NUM_SONGS_TO_GUESS; i++) {
         const randomIndex = Math.floor(Math.random() * filteredSongs.length);
-        const isDuplicate = selectedTracks.some(track => track.title === filteredSongs[randomIndex].title);
-        if (isDuplicate) {
-            i--;
-            continue;
+        if (selectedTracks.length > 0) {
+            if (selectedTracks.some(track => track.title === filteredSongs[randomIndex].title)) {
+                i--;
+                continue;
+            }
         }
         selectedTracks.push(filteredSongs[randomIndex]);
     }
@@ -277,13 +278,13 @@ io.on('connection', (socket) => {
 
         lobbies[lobbyName].players.push({ id: socket.id, username: username, choice: -1, score: 0 });
         socket.join(lobbyName);
-        socket.emit('joinLobbyResponse', '');
+        socket.emit('joinLobbyResponse', '', lobbies[lobbyName].rounds, lobbies[lobbyName].roundDuration);
         io.emit('onLobbyListChanged', getPublicLobbies());
         io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
         console.log(`User ${username} joined lobby ${lobbyName}`);
 
         if (lobbies[lobbyName].roundStarted) {
-            const { selectedTracks, correctIndex, correctSongData, currentRound, rounds, roundStartTimestamp } = lobbies[lobbyName];
+            const { selectedTracks, correctIndex, correctSongData, currentRound, roundStartTimestamp } = lobbies[lobbyName];
             const minScore = 0;
             socket.emit('onRoundStart', selectedTracks, correctIndex, correctSongData, currentRound, roundStartTimestamp, minScore);
         }
@@ -316,8 +317,7 @@ io.on('connection', (socket) => {
             return;
         }
         if (selectedArtists.length > 0) {
-            const filteredSongs = allSongs.filter(song => selectedArtists.includes(song.artist));
-            if (filteredSongs.length < NUM_SONGS_TO_GUESS) {
+            if (allSongs.filter(song => selectedArtists.includes(song.artist)).length < NUM_SONGS_TO_GUESS) {
                 socket.emit('onGameStartResponse', 'Not enough songs from selected artists!');
                 return;
             }
@@ -325,7 +325,7 @@ io.on('connection', (socket) => {
         lobbies[lobbyName].rounds = rounds;
         lobbies[lobbyName].gameMode = gameMode;
         if (gameMode === 'ultraInstinct') {
-            lobbies[lobbyName].roundDuration = 4;
+            lobbies[lobbyName].roundDuration = 5;
         } else {
             lobbies[lobbyName].roundDuration = roundDuration;
         }
@@ -337,7 +337,7 @@ io.on('connection', (socket) => {
         lobbies[lobbyName].thirdAnswerPlayerId = '';
         lobbies[lobbyName].timeSinceFirstAnswer = 0;
         lobbies[lobbyName].roundStartTimestamp = null;
-        lobbies[lobbyName].selectedArtists = selectedArtists;
+        lobbies[lobbyName].selectedArtists = selectedArtists.length > 0 ? selectedArtists : null;
         for (const player of lobbies[lobbyName].players) {
             player.score = 0;
             console.log(player.username + " score: " + player.score);
