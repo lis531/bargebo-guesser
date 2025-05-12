@@ -1,51 +1,30 @@
-import { useEffect, useRef, useState } from 'react';
-import { Socket } from 'socket.io-client';
+import { useState } from 'react';
 import './HostControls.css';
 
 interface HostControlsProps {
+    gameMode: string;
+    setGameMode: (gameMode: string) => void;
+    roundDuration: number;
+    setRoundDuration: (roundDuration: number) => void;
     artists: string[];
-    socket: Socket;
-    setGameStarted: (started: boolean) => void;
-    setRoundDuration: (duration: number) => void;
+    setArtists: (artists: string[]) => void;
+    filteredArtists: string[];
+    setFilteredArtists: (filteredArtists: string[]) => void;
+    selectedArtists: string[];
+    setSelectedArtists: (selectedArtists: string[]) => void;
+    startGame: () => void;
+    hostControlsRef: React.RefObject<HTMLDivElement | null>;
+    gsfeedbackRef: React.RefObject<HTMLParagraphElement | null>;
+    setCurrentMode: (mode: string) => void;
 }
 
-function HostControls() {
-    const [artists, setArtists] = useState<string[]>([]);
-    const [filteredArtists, setFilteredArtists] = useState<string[]>([]);
-    const [selectedArtists, setSelectedArtists] = useState<string[]>([]);
-
-    const [currentMode, setCurrentMode] = useState<string>('normal');
-    const [roundDuration, setRoundDuration] = useState<number>(20);
-    const [gameModeOptions, setGameModeOptions] = useState<{ [key: string]: string }>({});
-    const hostControlsRef = useRef<HTMLDivElement | null>(null);
-    const gsfeedbackRef = useRef<HTMLParagraphElement | null>(null);
-    const startGame = () => {
-        const roundsInput = document.getElementById('rounds') as HTMLInputElement;
-        const rounds = parseInt(roundsInput.value);
-        const podiumBonusScore = (document.getElementById('podiumBonusScore') as HTMLInputElement).checked;
-        if (isNaN(rounds) || rounds < 1 || rounds > 30) {
-            gsfeedbackRef.current!.innerText = "Please enter a valid number of rounds (1-30)";
-            return;
-        }
-        if (selectedArtists.length < 2) {
-            gsfeedbackRef.current!.innerText = "Please select at least 2 artists";
-            return;
-        }
-        gsfeedbackRef.current!.innerText = "";
-        // Emit the start game event with the selected artists and game mode
-    }
-
-
-    useEffect(() => {
-        const gameModeOptions = {
-            normal: "Normal",
-            ultraInstinct: "Ultra Instinct",
-            custom: "Custom"
-        };
-        setGameModeOptions(gameModeOptions);
-        setCurrentMode("normal");
-    }
-    , []);
+function HostControls({ setRoundDuration, artists, filteredArtists, setFilteredArtists, selectedArtists, setSelectedArtists, startGame, hostControlsRef, gsfeedbackRef }: HostControlsProps) {
+    const [currentMode, setCurrentMode] = useState<keyof typeof gameModeOptions>("normal");
+    const gameModeOptions = {
+        normal: "Normal",
+        ultraInstinct: "Ultra Instinct",
+        custom: "Custom"
+    };
 
     return (
         <div className='host-controls invisible' ref={hostControlsRef}>
@@ -69,7 +48,7 @@ function HostControls() {
                     {Object.entries(gameModeOptions).map(([key, value]) => {
                         if (key === currentMode) return null;
                         return (
-                            <div key={key} className='gameModeOption' onClick={() => { setCurrentMode(key); console.log(key); }}>
+                            <div key={key} className='gameModeOption' onClick={() => { setCurrentMode(key as keyof typeof gameModeOptions); console.log(key); }}>
                                 {value}
                             </div>
                         )
@@ -99,7 +78,7 @@ function HostControls() {
                             {selectedArtists.includes(artist) ? (
                                 <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 512 512" height="20px" width="20px" xmlns="http://www.w3.org/2000/svg"><path d="M256 48C141.31 48 48 141.31 48 256s93.31 208 208 208 208-93.31 208-208S370.69 48 256 48zm96 224h-80v80h-32v-80h-80v-32h80v-80h32v80h80z"></path></svg>
                             ) : (
-                                <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 512 512" height="20px" width="20px" xmlns="http://www.w3.org/2000/svg"><path fill="none" strokeMiterlimit="10" strokeWidth="32" d="M448 256c0-106-86-192-192-192S64 150 64 256s86 192 192 192 192-86 192-192z"></path><path fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="32" d="M256 176v160m80-80H176"></path></svg>
+                                <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 512 512" height="20px" width="20px" xmlns="http://www.w3.org/2000/svg"><path fill="none" strokeMiterlimit="10" strokeWidth="32" d="M448 256c0-106-86-192-192-192S64 150 64 256s86 192 192 192 192-93.31 192-192z"></path><path fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="32" d="M256 176v160m80-80H176"></path></svg>
                             )}
                             {artist}
                         </div>
@@ -111,7 +90,7 @@ function HostControls() {
                 <input id="podiumBonusScore" type="checkbox" />
             </div>
             <p id='gsfeedback' className='error' ref={gsfeedbackRef}></p>
-            <button className='submitButton' type="submit" onClick={startGame}>Start</button>
+            <button className='submitButton' type="submit" onClick={() => startGame()}>Start</button>
         </div>
     );
 }

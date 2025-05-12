@@ -11,10 +11,9 @@ interface Lobby {
 
 function LobbiesList({ joinLobby, socket, lobbiesListRef }: { joinLobby: (lobbyName: string) => void; socket: Socket; lobbiesListRef: React.RefObject<HTMLDivElement | null> }) {
     const [lobbyList, setLobbyList] = useState<{ [key: string]: Lobby }>({});
-    setLobbyList({});
     
     useEffect(() => {
-        socket.on('lobbyList', (lobbies: { [key: string]: Lobby }) => {
+        socket.on('onLobbyListChanged', (lobbies: { [key: string]: Lobby }) => {
             setLobbyList(lobbies);
         });
 

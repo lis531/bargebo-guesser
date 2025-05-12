@@ -525,7 +525,7 @@ function App() {
 				<LobbiesList joinLobby={joinLobby} socket={socket} lobbiesListRef={lobbiesListRef}/>
 				<div className='game-screen-content hidden' ref={gameScreenContentRef}>
 					<h2 className='timer hidden invisible' ref={timerRef}></h2>
-					<HostControls />
+					<HostControls gameMode={currentMode} setGameMode={setCurrentMode} roundDuration={roundDuration} setRoundDuration={setRoundDuration} artists={artists} setArtists={setArtists} filteredArtists={filteredArtists} setFilteredArtists={setFilteredArtists} selectedArtists={selectedArtists} setSelectedArtists={setSelectedArtists} startGame={startGame} hostControlsRef={hostControlsRef} setCurrentMode={setCurrentMode} gsfeedbackRef={gsfeedbackRef}/>
 				</div>
 				<div className='round-summary hidden' ref={roundSummaryRef}>
 					{correctSongIndex !== undefined && songs[correctSongIndex].title && songs[correctSongIndex].artist ? (
