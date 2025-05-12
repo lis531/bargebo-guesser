@@ -29,7 +29,7 @@
     gap: 10px;
     cursor: pointer;
     transition: border-color 0.25s;
-    box-shadow: 0 0 3px 1px #000000, inset 0 0 0 100px rgba(0, 0, 0, 0.6);
+    box-shadow:  var(--box-shadow-color), inset 0 0 0 100px rgba(0, 0, 0, 0.6);
     background-image: url(https://picsum.photos/380/80?random0);
     background-position: center;
     overflow: hidden;

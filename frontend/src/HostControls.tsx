@@ -55,12 +55,8 @@ function HostControls({ setRoundDuration, artists, filteredArtists, setFilteredA
                     })}
                 </div>
             </div>
-            {currentMode !== "ultraInstinct" ? (
-                <>
-                    <label htmlFor='roundDuration'>Round duration:</label>
-                    <input id='roundDuration' type="number" min={5} max={30} defaultValue={20} placeholder="Round duration" onChange={(e) => setRoundDuration(parseInt(e.target.value))} />
-                </>
-            ) : null}
+            <label htmlFor='roundDuration'>Round duration:</label>
+            <input id='roundDuration' type="number" min={5} max={30} defaultValue={20} disabled={currentMode == "ultraInstinct"} placeholder="Round duration" onChange={(e) => setRoundDuration(parseInt(e.target.value))} />
             <label htmlFor='artists-list'>Artists:</label>
             <div className='artists-list'>
                 <div className='artists-list-header'>
