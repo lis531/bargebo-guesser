@@ -1,0 +1,63 @@
+.lobbies-list {
+    width: 30rem;
+
+    @media screen and (max-width: 1000px) {
+        margin-top: 2em;
+        width: auto;
+    }
+}
+
+.lobbies-list>ul {
+    display: flex;
+    flex-direction: column;
+    gap: 1em;
+    margin: 0;
+    padding: 0;
+    list-style-type: none;
+}
+
+.lobbies-list>ul>li {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: inherit;
+    color: rgba(255, 255, 255, 0.87);
+    background-color: var(--button-background-color);
+    border-radius: 8px;
+    padding: 0.5em 1em;
+    gap: 10px;
+    cursor: pointer;
+    transition: border-color 0.25s;
+    box-shadow:  var(--box-shadow-color), inset 0 0 0 100px rgba(0, 0, 0, 0.6);
+    background-image: url(https://picsum.photos/380/80?random0);
+    background-position: center;
+    overflow: hidden;
+
+    h2 {
+        margin: 0;
+        font-size: 2em;
+    }
+
+    .join-lobby-button {
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle at 50% 50%,
+                rgba(52, 104, 48, 0.5) 0%,
+                rgba(0, 0, 0, 0.5) 100%);
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        opacity: 0;
+        transition: opacity 0.25s, transform 0.25s;
+        transform: translateY(0.5em);
+    }
+
+    &:hover>.join-lobby-button {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

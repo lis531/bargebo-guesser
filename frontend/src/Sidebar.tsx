@@ -36,7 +36,7 @@ function Sidebar(props: { players: Player[] } & Props) {
     const { players } = props;
 
     const initialVolume = Number(localStorage.getItem('volume')) || 50;
-    const initialTheme = localStorage.getItem('theme') || 'system';
+    const initialTheme = localStorage.getItem('theme') || 'default';
     const [theme, setTheme] = useState(initialTheme);
 
     const toggleSettingsView = () => {
@@ -92,8 +92,8 @@ function Sidebar(props: { players: Player[] } & Props) {
                     </div>
                     <div className="inline-form-group">
                         <label htmlFor="darkMode">Theme: </label>
-                        <select id="theme" name="theme" value={theme} onChange={(e) => handleThemeChange(e.target.value)}>
-                            <option value="system">System</option>
+                        <select id="theme" name="theme" value={theme} onChange={(e) => handleThemeChange(e.target.value)} defaultValue={initialTheme}>
+                            <option value="default">Default</option>
                             <option value="light">Light</option>
                             <option value="dark">Dark</option>
                         </select>
