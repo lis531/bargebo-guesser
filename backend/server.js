@@ -19,13 +19,16 @@ const serviceAccount = {
     token_uri: process.env.FIREBASE_TOKEN_URI,
     auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
     client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
-    universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN
+    universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN,
+    databaseURL: process.env.FIREBASE_DATABASE_URL
 };
 
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
-    storageBucket: "bargebo-27328.firebasestorage.app"
+    storageBucket: "bargebo-27328.firebasestorage.app",
+    databaseURL: process.env.FIREBASE_DATABASE_URL
 });
+
 
 const bucket = admin.storage().bucket();
 
@@ -48,6 +51,44 @@ app.use((req, res, next) => {
     }
     next();
 });
+
+const db = admin.database();
+
+let allSongs = [];
+let artists = [];
+
+function loadSongsFromDatabase() {
+    db.ref('/songs').on('value', (snapshot) => {
+        try {
+            const songsData = snapshot.val();
+            if (songsData && Array.isArray(songsData)) {
+                allSongs = songsData.map(song => ({
+                    ...song,
+                    cover: `https://img.youtube.com/vi/${song.id}/0.jpg`,
+                    url: `https://www.youtube.com/watch?v=${song.id}`
+                }));
+                
+                artists = allSongs.map(song => song.artist).filter((value, index, self) => self.indexOf(value) === index);
+                console.log(`Loaded songs from Firebase: ${allSongs.length} songs, ${artists.length} artists.`);
+            } else {
+                console.log("No songs found in Firebase database or invalid format.");
+                allSongs = [];
+                artists = [];
+            }
+        } catch (error) {
+            console.error("Error processing songs from Firebase:", error);
+            allSongs = [];
+            artists = [];
+        }
+    })
+}
+
+loadSongsFromDatabase();
+
+setInterval(() => {
+    console.log("Performing periodic refresh of songs data...");
+    loadSongsFromDatabase();
+}, 60 * 60 * 1000);
 
 function streamToBuffer(stream) {
     return new Promise((resolve, reject) => {
@@ -85,17 +126,6 @@ async function downloadFirebase(videoUrl) {
 }
 
 const lobbies = {};
-
-const allSongs = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'songDB.json'), 'utf8'));
-for (let i = 0; i < allSongs.length; i++) {
-    allSongs[i].cover = `https://img.youtube.com/vi/${allSongs[i].id}/0.jpg`;
-    allSongs[i].url = `https://www.youtube.com/watch?v=${allSongs[i].id}`;
-    delete allSongs[i].id;
-}
-
-console.log("Loaded the songs DB of " + allSongs.length + " songs.");
-
-const artists = allSongs.map(song => song.artist).filter((value, index, self) => self.indexOf(value) === index);
 
 async function announceRoundStart(lobbyName) {
     if (!lobbies[lobbyName]) return;
