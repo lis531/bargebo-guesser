@@ -206,7 +206,16 @@ function App() {
 				sourceAudioBufferRef.current.stop();
 				sourceAudioBufferRef.current = null;
 			}
-			roundSummaryRef.current?.classList.add('hidden');
+
+			clearInterval((window as any).bargeboTimerInterval);
+			progressBarRef.current!.style.width = "100%";
+			setTimeout(() => {
+				progressBarRef.current?.classList.add('right');
+				progressBarRef.current!.animate([{ width: "100%" }, { width: "0%" }], { duration: 1000, easing: 'linear', fill: 'none' }).finished.then(() => {
+					progressBarRef.current!.style.width = "0%";
+				});
+			}, 500);
+			
 			gameScreenContentRef.current?.classList.add('hidden');
 			songPickerRef.current?.animate([{ transform: 'translateY(0%)', opacity: 1 }, { transform: 'translateY(100%)', opacity: 0 }], { duration: 400, easing: 'ease', fill: 'forwards' }).finished.then(() => {
 				songPickerRef.current?.classList.add('hidden');
