@@ -6,6 +6,11 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+if (!process.env.FIREBASE_PRIVATE_KEY || !process.env.LAST_FM_API_KEY) {
+    console.error('❌ Missing required environment variables');
+    process.exit(1);
+}
+
 const serviceAccount = {
     type: process.env.FIREBASE_TYPE,
     project_id: process.env.FIREBASE_PROJECT_ID,
@@ -63,18 +68,33 @@ async function fetchTracks() {
     const limit = 50;
     const totalPages = 20;
     let allTracks = [];
+    const seenTracks = new Set();
 
     for (let page = 1; page <= totalPages; page++) {
         const url = `http://ws.audioscrobbler.com/2.0/?method=chart.gettoptracks&api_key=${LAST_FM_API_KEY}&format=json&limit=${limit}&page=${page}`;
-        const response = await fetch(url);
-        const data = await response.json();
+        
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
 
-        if (allTracks.some(track => track.name === data.tracks.track[0].name)) {
-            continue;
-        }
-
-        if (data.tracks && data.tracks.track) {
-            allTracks.push(...data.tracks.track);
+            if (data.tracks && data.tracks.track) {
+                const newTracks = data.tracks.track.filter(track => {
+                    const key = `${track.name.toLowerCase()}|${track.artist.name.toLowerCase()}`;
+                    if (seenTracks.has(key)) return false;
+                    seenTracks.add(key);
+                    return true;
+                });
+                
+                allTracks.push(...newTracks);
+                
+                if (page % 5 === 0) {
+                    console.log(`📊 Fetched ${page}/${totalPages} pages (${allTracks.length} unique tracks)`);
+                }
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (error) {
+            console.error(`❌ Error fetching page ${page}: ${error.message}`);
         }
     }
 
@@ -199,7 +219,7 @@ async function downloadSong(videoUrl) {
     }
 
     return new Promise((resolve, reject) => {
-        exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:30" --force-overwrites --audio-format opus --audio-quality 64K --postprocessor-args "ffmpeg:-acodec libopus -b:a 64k -af loudnorm" -o "${`audio/${videoID}.opus`}" ${videoUrl}`, async (error) => {
+        exec(`yt-dlp -f bestaudio -x --download-sections "*1:00-1:30" --force-overwrites --audio-format opus --audio-quality 64K --postprocessor-args "ffmpeg:-acodec libopus -b:a 64k -af loudnorm" -o "${`audio/${videoID}.opus`}" ${videoUrl}`, async (error, stdout, stderr) => {
             if (error) {
                 console.error(`Error downloading track: ${error.message}`);
                 reject(error);
@@ -269,46 +289,59 @@ async function uploadFirebase(videoUrl) {
                     } else if (!fileExists) {
                         errorMessage = 'No file was created';
                     }
+                    const errOut = (stderr || '') + ' ' + errorMessage;
+                    const categories = [
+                        {
+                            type: 'AGE_RESTRICTED',
+                            message: `❌ Age-restricted video: ${videoID}`,
+                            keywords: [
+                                'Sign in to confirm your age',
+                                'age-restricted',
+                                'inappropriate for some users',
+                                'This video may be inappropriate for some users'
+                            ]
+                        },
+                        {
+                            type: 'YOUTUBE_BLOCKED',
+                            message: `🚫 YouTube blocking download: ${videoID}`,
+                            keywords: [
+                                'HTTP error 403',
+                                'Failed to open segment',
+                                'Unable to download',
+                                'DRM protected',
+                                'SABR streaming',
+                                'unable to extract uploader id',
+                                'This live stream recording is not available'
+                            ]
+                        },
+                        {
+                            type: 'VIDEO_UNAVAILABLE',
+                            message: `❌ Video unavailable: ${videoID}`,
+                            keywords: [
+                                'Private video',
+                                'Video unavailable',
+                                'removed by the user',
+                                'This video is not available',
+                                'Video does not exist'
+                            ]
+                        },
+                        {
+                            type: 'SCHEDULED_VIDEO',
+                            message: `⏳ Scheduled/premiere video: ${videoID}`,
+                            keywords: [
+                                'Premieres in',
+                                'This live event will begin in',
+                                'Waiting for scheduled stream'
+                            ]
+                        }
+                    ];
 
-                    const errorOutput = (stderr || '') + ' ' + errorMessage;
-                    
-                    if (errorOutput.includes('Sign in to confirm your age') || 
-                        errorOutput.includes('age-restricted') ||
-                        errorOutput.includes('inappropriate for some users') ||
-                        errorOutput.includes('This video may be inappropriate for some users')) {
-                        console.log(`❌ Age-restricted video: ${videoID}`);
-                        reject(new Error('AGE_RESTRICTED'));
-                        return;
-                    }
-                    
-                    if (errorOutput.includes('HTTP error 403') ||
-                        errorOutput.includes('Failed to open segment') ||
-                        errorOutput.includes('Unable to download') ||
-                        errorOutput.includes('DRM protected') ||
-                        errorOutput.includes('SABR streaming') ||
-                        errorOutput.includes('unable to extract uploader id') ||
-                        errorOutput.includes('This live stream recording is not available')) {
-                        console.log(`🚫 YouTube blocking download: ${videoID}`);
-                        reject(new Error('YOUTUBE_BLOCKED'));
-                        return;
-                    }
-                    
-                    if (errorOutput.includes('Private video') ||
-                        errorOutput.includes('Video unavailable') ||
-                        errorOutput.includes('removed by the user') ||
-                        errorOutput.includes('This video is not available') ||
-                        errorOutput.includes('Video does not exist')) {
-                        console.log(`❌ Video unavailable: ${videoID}`);
-                        reject(new Error('VIDEO_UNAVAILABLE'));
-                        return;
-                    }
-
-                    if (errorOutput.includes('Premieres in') ||
-                        errorOutput.includes('This live event will begin in') ||
-                        errorOutput.includes('Waiting for scheduled stream')) {
-                        console.log(`⏳ Scheduled/premiere video: ${videoID}`);
-                        reject(new Error('SCHEDULED_VIDEO'));
-                        return;
+                    for (const { type, message, keywords } of categories) {
+                        if (keywords.some(k => errOut.includes(k))) {
+                            console.log(message);
+                            reject(new Error(type));
+                            return;
+                        }
                     }
 
                     console.error(`❌ Error downloading track ${videoID}: ${errorMessage}`);

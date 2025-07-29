@@ -1,18 +1,21 @@
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import fs from 'fs';
 import admin from 'firebase-admin';
 import dotenv from 'dotenv';
-import path from 'path';
 
 dotenv.config();
+
+if (!process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_DATABASE_URL) {
+    console.error('❌ Missing required Firebase environment variables');
+    process.exit(1);
+}
 
 const serviceAccount = {
     type: process.env.FIREBASE_TYPE,
     project_id: process.env.FIREBASE_PROJECT_ID,
     private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-    private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     client_email: process.env.FIREBASE_CLIENT_EMAIL,
     client_id: process.env.FIREBASE_CLIENT_ID,
     auth_uri: process.env.FIREBASE_AUTH_URI,
@@ -33,6 +36,8 @@ admin.initializeApp({
 const bucket = admin.storage().bucket();
 
 const NUM_SONGS_TO_GUESS = 4;
+const MIN_SCORE = 80;
+const MAX_SCORE = 500;
 
 const app = express();
 const server = createServer(app);
@@ -141,16 +146,18 @@ async function announceRoundStart(lobbyName) {
 
     const filteredSongs = lobbies[lobbyName].selectedArtists !== null ? allSongs.filter(song => lobbies[lobbyName].selectedArtists.includes(song.artist)) : allSongs;
     const selectedTracks = [];
-    for (let i = 0; i < NUM_SONGS_TO_GUESS; i++) {
+    const usedTitles = new Set();
+
+    while (selectedTracks.length < NUM_SONGS_TO_GUESS && selectedTracks.length < filteredSongs.length) {
         const randomIndex = Math.floor(Math.random() * filteredSongs.length);
-        if (selectedTracks.length > 0) {
-            if (selectedTracks.some(track => track.title === filteredSongs[randomIndex].title)) {
-                i--;
-                continue;
-            }
+        const track = filteredSongs[randomIndex];
+        
+        if (!usedTitles.has(track.title)) {
+            selectedTracks.push(track);
+            usedTitles.add(track.title);
         }
-        selectedTracks.push(filteredSongs[randomIndex]);
     }
+
     console.log("Selected tracks: " + selectedTracks.map(track => track.title).join(", "));
 
     const correctIndex = Math.floor(Math.random() * selectedTracks.length);
@@ -209,10 +216,18 @@ async function announceRoundEnd(lobbyName) {
                 }
             }
         }
-        lobbies[lobbyName].players = lobbies[lobbyName].players.filter(player => player.isHost);
+        
+        const hostPlayer = lobbies[lobbyName].players.find(player => player.isHost);
+
+        if (hostPlayer) {
+            hostPlayer.score = 0;
+            lobbies[lobbyName].players = [hostPlayer];
+        } else {
+            lobbies[lobbyName].players = [];
+        }
+        
         io.to(lobbyName).emit('onPlayersChanged', lobbies[lobbyName].players.sort((a, b) => b.score - a.score));
         io.emit('onLobbyListChanged', getPublicLobbies());
-        lobbies[lobbyName].players[0].score = 0;
     }
 }
 
@@ -234,25 +249,28 @@ function getPublicLobbies() {
 }
 
 function leaveLobby(socket) {
-    for (const lobby in lobbies) {
-        lobbies[lobby].players = lobbies[lobby].players.filter(p => p.id !== socket.id);
-        const socketToKick = io.sockets.sockets.get(socket.id);
-        if (socketToKick) {
-            socketToKick.leave(lobby);
+    const entry = Object.entries(lobbies).find(([_, lobby]) => lobby.players.some(p => p.id === socket.id));
+
+    if (!entry) return;
+    
+    const [lobbyName, lobby] = entry;
+    
+    lobby.players = lobby.players.filter(p => p.id !== socket.id);
+    socket.leave(lobbyName);
+    console.log(`Client disconnected: ${socket.id}`);
+    
+    if (lobby.players.length === 0) {
+        clearTimeout(lobby.answerTimeout);
+        delete lobbies[lobbyName];
+        console.log(`Lobby ${lobbyName} deleted`);
+    } else {
+        if (lobby.players.length > 0 && !lobby.players.some(p => p.isHost)) {
+            lobby.players[0].isHost = true;
         }
-        console.log(`Client disconnected: ${socket.id}`);
-        if (lobbies[lobby].players.length === 0) {
-            clearTimeout(lobbies[lobby].answerTimeout);
-            delete lobbies[lobby];
-            console.log(`Lobby ${lobby} deleted`);
-        } else {
-            if (lobbies[lobby].players.length > 0) {
-                lobbies[lobby].players[0].isHost = true;
-            }
-            io.to(lobby).emit('onPlayersChanged', lobbies[lobby].players.sort((a, b) => b.score - a.score));
-        }
-        io.emit('onLobbyListChanged', getPublicLobbies());
+        io.to(lobbyName).emit('onPlayersChanged', lobby.players.sort((a, b) => b.score - a.score));
     }
+    
+    io.emit('onLobbyListChanged', getPublicLobbies());
 }
 
 io.on('connection', (socket) => {
@@ -280,7 +298,8 @@ io.on('connection', (socket) => {
             thirdAnswerPlayerId: '',
             timeSinceFirstAnswer: 0,
             answerTimeout: null,
-            podiumBonusScore: false
+            podiumBonusScore: false,
+            selectedArtists: null
         };
         socket.join(lobbyName);
         socket.emit('createLobbyResponse', lobbyName, '', artists);
@@ -362,7 +381,7 @@ io.on('connection', (socket) => {
         lobbies[lobbyName].podiumBonusScore = podiumBonusScore;
         lobbies[lobbyName].roundStarted = false;
         lobbies[lobbyName].currentRound = 0;
-        lobbies[lobbyName].firstAnswserPlayerId = '';
+        lobbies[lobbyName].firstAnswerPlayerId = '';
         lobbies[lobbyName].secondAnswerPlayerId = '';
         lobbies[lobbyName].thirdAnswerPlayerId = '';
         lobbies[lobbyName].timeSinceFirstAnswer = 0;
@@ -422,11 +441,12 @@ io.on('connection', (socket) => {
                             player.score += 10;
                         }
                     }
-                    const maxScore = 500, minScore = 80, timeLimit = lobby.roundDuration;
+                    const maxScore = MAX_SCORE, minScore = MIN_SCORE, timeLimit = lobby.roundDuration;
                     const timePassed = (Date.now() - lobby.roundStartTimestamp) / 1000;
                     if (lobby.gameMode === "firstToAnswer") {
-                        // nie wiem czy to działa
-                        player.score += Math.round(minScore + (maxScore - minScore) * (1 / timePassed - lobby.timeSinceFirstAnswer));
+                        const timeSinceFirst = (lobby.timeSinceFirstAnswer / 1000);
+                        const scoreToAdd = Math.round(minScore + (maxScore - minScore) * (1 / (timePassed - timeSinceFirst + 1)));
+                        player.score += Math.max(scoreToAdd, minScore);
                     } else {
                         if (timePassed <= 0.5) {
                             player.score += maxScore;

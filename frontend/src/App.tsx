@@ -216,17 +216,28 @@ function App() {
 				});
 			}, 500);
 			
-			gameScreenContentRef.current?.classList.add('hidden');
-			songPickerRef.current?.animate([{ transform: 'translateY(0%)', opacity: 1 }, { transform: 'translateY(100%)', opacity: 0 }], { duration: 400, easing: 'ease', fill: 'forwards' }).finished.then(() => {
-				songPickerRef.current?.classList.add('hidden');
-				sidebarRef.current?.classList.remove('open');
-				sidebarRef.current?.children[0].animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, easing: 'ease', fill: 'forwards' }).finished.then(() => {
-					setGameEnded(true);
+			songPickerRef.current?.animate([{ transform: 'translateY(0%)', opacity: 1 }, { transform: 'translateY(100%)', opacity: 0 }], { duration: 300, easing: 'ease', fill: 'forwards' }).finished.then(() => {
+				songPickerRef.current?.classList.add('invisible');
+			});
+			gameScreenContentRef.current?.animate([{ transform: 'translateY(0%)', opacity: 1 }, { transform: 'translateY(100%)', opacity: 0 }], { duration: 300, easing: 'ease', fill: 'forwards' }).finished.then(() => {
+				gameScreenContentRef.current?.classList.add('hidden');
+				roundSummaryRef.current?.classList.remove('hidden');
+				roundSummaryRef.current?.animate([{ transform: 'translateY(100%)', opacity: 0 }, { transform: 'translateY(0)', opacity: 1 }], { duration: 400, easing: 'ease', fill: 'forwards' }).finished.then(() => {
+					animatePlayerMoves();
+					setTimeout(() => {
+						roundSummaryRef.current?.animate([{ transform: 'translateY(0%)', opacity: 1 }, { transform: 'translateY(30%)', opacity: 0 }], { duration: 300, easing: 'ease', fill: 'forwards' }).finished.then(() => {
+							roundSummaryRef.current?.classList.add('hidden');
+							sidebarRef.current?.classList.remove('open');
+							sidebarRef.current?.children[0].animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, easing: 'ease', fill: 'forwards' }).finished.then(() => {
+								setGameEnded(true);
+								setFinalPlayers(finalPlayers);
+								gameSummaryRef.current?.classList.remove('hidden');
+								gameSummaryRef.current?.animate([{ transform: 'translateY(100%)', opacity: 0 }, { transform: 'translateY(0%)', opacity: 1 }], { duration: 400, easing: 'ease', fill: 'forwards' });
+							});
+						});
+					}, 1500);
 				});
 			});
-			setFinalPlayers(finalPlayers);
-			gameSummaryRef.current?.classList.remove('hidden');
-			gameSummaryRef.current?.animate([{ transform: 'translateY(100%)', opacity: 0 }, { transform: 'translateY(0%)', opacity: 1 }], { duration: 400, easing: 'ease', fill: 'forwards' });
 		});
 
 		socket.on('onRoundEnd', () => {
@@ -278,6 +289,10 @@ function App() {
 			socket.off('onRoundStart');
 			socket.off('onGameEnd');
 			socket.off('onRoundEnd');
+			socket.off('stopAudio');
+			socket.off('pingForOffset');
+			
+			clearInterval((window as any).bargeboTimerInterval);
 			if (audioContextRef.current) {
 				audioContextRef.current.close();
 			}
